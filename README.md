@@ -34,12 +34,24 @@ Landwise is an AI-powered resume tailoring app. Paste your resume and a job desc
 
 ---
 
-## Quick Start
+## Using Landwise
+
+No sign-up. No API keys. Just open the app and start tailoring.
+
+1. Upload your resume (PDF) or paste it as text
+2. Paste the job description
+3. Click **Transform**
+
+---
+
+## Self-Hosting / Development
+
+If you want to run your own instance:
 
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/landwise.git
+git clone https://github.com/stanqiu111/landwise.git
 cd landwise
 ```
 
@@ -55,15 +67,14 @@ npm install
 cp .env.example .env
 ```
 
-Open `.env` and fill in your keys:
+Add your own API keys to `.env` — these stay on your server and are never exposed to users:
 
 ```env
-# Required — get one at https://console.anthropic.com/settings/keys
+# Required — https://console.anthropic.com/settings/keys
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Optional — enables semantic embedding retrieval
-# Without this, the app falls back to TF-IDF retrieval (still works great)
-# Get one at https://platform.openai.com/api-keys
+# Optional — enables semantic embedding retrieval (falls back to TF-IDF without it)
+# https://platform.openai.com/api-keys
 OPENAI_API_KEY=sk-...
 ```
 
