@@ -8,14 +8,15 @@ Landwise is an AI-powered resume tailoring app. Paste your resume and a job desc
 
 ## Features
 
-- **AI resume tailoring** — rewrites your resume using only your real experience, never invents facts
-- **Claim-based anti-hallucination** — extracts verifiable claims from your resume and matches them to job requirements before rewriting
+- **AI resume tailoring** — rewrites your resume around experience supported by your source text
+- **Claim-based evidence checks** — extracts quoted claims from your resume and matches them to job requirements before rewriting
 - **Embedding RAG** — uses semantic vector search to retrieve the most relevant resume sections per job requirement (falls back to TF-IDF if no OpenAI key)
 - **Resume analysis** — instant feedback on resume quality, section scores, and suggested LLM/AI skills to add
-- **Match score** — estimated ATS keyword match after tailoring
+- **Match score** — estimated keyword overlap after tailoring
 - **Skills gap** — surfaces JD requirements your resume can't support, instead of inventing them
 - **PDF & DOCX export** — download your tailored resume in either format
 - **PDF upload** — drag-and-drop your existing resume as a PDF
+- **Readable output** — clear section hierarchy and bullets in the preview, PDF, and DOCX
 
 ---
 
@@ -107,7 +108,11 @@ Upload resume  →  Paste job description  →  Click Transform
                                    └───────────────────────────────────┘
 ```
 
-**Anti-hallucination by design:** every rewritten bullet must trace back to a claim extracted from your original resume. Requirements the resume can't support are surfaced as a skills gap — not invented.
+**Evidence-first tailoring:** the writer is instructed to use only source resume facts. Requirements the resume cannot support are surfaced as a skills gap.
+
+The app uses prompt and validation improvements rather than model fine-tuning. The writer receives the complete original resume, while retrieval identifies evidence to emphasize. Claimed evidence must quote source text, and the finished draft is checked for contact details, education, and new numeric claims. Review the result before submitting it; these checks cannot prove every sentence is accurate.
+
+Run `npm test`, `npm run lint`, and `npm run build` when changing the pipeline. See [QUALITY.md](./QUALITY.md) for writing rules, evaluation cases, and the GitHub projects that informed the approach.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full technical breakdown.
 

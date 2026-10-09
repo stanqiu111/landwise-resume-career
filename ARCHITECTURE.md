@@ -70,7 +70,7 @@ Output guardrail: if `requiredSkills` is empty and `roleTitle` is blank, the JD 
 
 ### Phase 1.25 — Embedding RAG (in-memory vector retrieval)
 
-After the JD is parsed, the resume is chunked and the most relevant sections are retrieved before any LLM call touches the resume text.
+After the JD is parsed, the resume is chunked and the most relevant sections are retrieved for writing emphasis.
 
 **How it works:**
 
@@ -78,13 +78,13 @@ After the JD is parsed, the resume is chunked and the most relevant sections are
 2. `buildRetrievalIndex(chunks)` embeds every chunk with **OpenAI `text-embedding-3-small`** and builds an in-memory `VectorIndex` (an array of `{chunk, embedding: number[]}` entries).
 3. All JD requirement strings (roleTitle, requiredSkills, niceToHaveSkills, mustHaveKeywords) are embedded in a **single batched call**.
 4. For each query embedding, cosine similarity against all chunk embeddings returns the top-K chunks. Results are de-duplicated across all queries.
-5. Only the retrieved chunks are passed to Phases 1.5 and 2 — Claude never sees irrelevant resume sections.
+5. Retrieved chunks provide relevance hints for Phase 2. Claim extraction and the final writer also receive the complete original resume, so contact details and sections with fewer job keywords are not lost.
 
 **Why embeddings over TF-IDF:**
 TF-IDF requires exact or near-exact word overlap. Embeddings capture semantic meaning, so "React developer" retrieves chunks mentioning "frontend engineering", "component architecture", or "UI work" even if "React" isn't in those sections. This produces better claim coverage on semantically rich JDs.
 
 **Fallback behaviour:**
-If `OPENAI_API_KEY` is not set, or if the embedding API call fails at runtime, `buildRetrievalIndex` automatically falls back to the original TF-IDF index. The transform flow continues uninterrupted — the only difference is retrieval quality. The `index.type` field (`'embedding'` or `'tfidf'`) is logged at startup so the active strategy is always visible.
+If `OPENAI_API_KEY` is not set, or if the embedding API call fails at runtime, `buildRetrievalIndex` automatically falls back to the original TF-IDF index. The transform flow continues uninterrupted — the only difference is retrieval quality. The index exposes its active strategy as `type` (`'embedding'` or `'tfidf'`).
 
 **Swap guide:**
 To replace OpenAI with Voyage AI, Cohere, or a local model, edit `server/embeddings.js` only — change the `embedBatch` implementation. Nothing in `server/rag.js` or `server.js` needs to change. To add a persistent vector database (Qdrant, Pinecone, Chroma, Supabase pgvector), implement `VectorIndex` with the same `.query(embedding, topK)` interface backed by the DB client.
@@ -93,7 +93,7 @@ To replace OpenAI with Voyage AI, Cohere, or a local model, edit `server/embeddi
 
 This is the hallucination-prevention layer. Two calls run in parallel:
 
-**Call A** — Resume claim extraction:
+**Call A** — Resume claim extraction from the full original resume:
 Every verifiable fact in the resume becomes a typed claim:
 ```json
 { "id": "c1", "text": "Reduced latency by 40%", "type": "metric", "raw_phrase": "..." }
@@ -126,9 +126,9 @@ claim_coverage = covered_requirements / total_requirements × 100
 The final rewrite call receives:
 - The structured JD analysis (Phase 1)
 - The full claim analysis (Phase 1.5) — what the resume has vs. what the JD needs
-- The original resume text
+- The full original resume text and retrieved evidence to emphasize
 
-The system prompt explicitly forbids fabrication — *"rewrite ONLY using facts from the claim bank"*. Returns:
+The system prompt explicitly forbids fabrication, requires conventional sections and short readable bullets, and treats the original resume as the only source of candidate facts. A deterministic check rejects omitted email/education and new numbers. Returns:
 
 ```json
 {

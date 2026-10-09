@@ -54,25 +54,21 @@ export function validateClaimAnalysis(data) {
 }
 
 export function validateClaims(data) {
-  try {
-    return z.array(ClaimSchema).parse(data);
-  } catch {
-    return [];
-  }
+  return parseValidItems(data, ClaimSchema);
 }
 
 export function validateRequirements(data) {
-  try {
-    return z.array(JDRequirementSchema).parse(data);
-  } catch {
-    return [];
-  }
+  return parseValidItems(data, JDRequirementSchema);
 }
 
 export function validateMatches(data) {
-  try {
-    return z.array(ClaimMatchSchema).parse(data);
-  } catch {
-    return [];
-  }
+  return parseValidItems(data, ClaimMatchSchema);
+}
+
+function parseValidItems(data, schema) {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap(item => {
+    const result = schema.safeParse(item);
+    return result.success ? [result.data] : [];
+  });
 }

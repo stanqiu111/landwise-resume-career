@@ -1,8 +1,20 @@
 import { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
-import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import ClaimCoverage from './ClaimCoverage';
 import UnsupportedRequirements from './UnsupportedRequirements';
+import { parseResumeLines } from '../resumeDocument';
+
+function ResumePreview({ text, className = '' }) {
+  return <div className={`resume-document ${className}`}>
+    {parseResumeLines(text).map((line, i) => {
+      if (line.type === 'name') return <h2 key={i}>{line.text}</h2>;
+      if (line.type === 'section') return <h3 key={i}>{line.text}</h3>;
+      if (line.type === 'bullet') return <p className="resume-bullet" key={i}>{line.text}</p>;
+      return <p className={line.type === 'contact' ? 'resume-contact' : ''} key={i}>{line.text}</p>;
+    })}
+  </div>;
+}
 
 function MatchScore({ score }) {
   const color = score >= 75 ? 'var(--success)' : score >= 50 ? '#facc15' : 'var(--error)';
@@ -14,7 +26,7 @@ function MatchScore({ score }) {
       </div>
       <div className="match-info">
         <span className="match-label" style={{ color }}>{label}</span>
-        <span className="match-sub">Estimated ATS keyword match</span>
+        <span className="match-sub">Estimated keyword overlap</span>
       </div>
     </div>
   );
@@ -40,37 +52,54 @@ export default function OutputPanel({ result, loading, loadingPhase }) {
 
   function handleDownloadPDF() {
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-    const margin = 50;
-    const lineHeight = 13;
+    const margin = 48;
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
-
-    doc.setFont('Courier', 'normal');
-    doc.setFontSize(10);
-
-    const lines = doc.splitTextToSize(result.transformedResume, pageWidth - margin * 2);
     let y = margin;
-    for (const line of lines) {
-      if (y + lineHeight > pageHeight - margin) {
-        doc.addPage();
-        y = margin;
+    for (const line of parseResumeLines(result.transformedResume)) {
+      const isName = line.type === 'name';
+      const isSection = line.type === 'section';
+      const isBullet = line.type === 'bullet';
+      const size = isName ? 17 : isSection ? 10.5 : 10;
+      const lineHeight = isName ? 21 : 14;
+      const before = isSection ? 12 : isName ? 0 : 2;
+      const left = margin + (isBullet ? 13 : 0);
+      doc.setFont('helvetica', isName || isSection ? 'bold' : 'normal');
+      doc.setFontSize(size);
+      const wrapped = doc.splitTextToSize(line.text, pageWidth - margin - left);
+      if (y + before + wrapped.length * lineHeight > pageHeight - margin) {
+        doc.addPage(); y = margin;
       }
-      doc.text(line, margin, y);
-      y += lineHeight;
+      y += before;
+      if (isBullet) doc.text('•', margin + 2, y);
+      for (const part of wrapped) {
+        doc.text(part, left, y);
+        y += lineHeight;
+      }
+      if (isSection) {
+        doc.setDrawColor(175, 184, 196);
+        doc.line(margin, y - 9, pageWidth - margin, y - 9);
+        y += 2;
+      }
     }
     doc.save('tailored-resume.pdf');
   }
 
   async function handleDownloadDOCX() {
-    const paragraphs = result.transformedResume.split('\n').map(
-      line => new Paragraph({
-        children: [new TextRun({ text: line, font: 'Calibri', size: 22 })],
-        spacing: { after: 0 },
-      })
-    );
+    const paragraphs = parseResumeLines(result.transformedResume).map(line => new Paragraph({
+      heading: line.type === 'section' ? HeadingLevel.HEADING_2 : undefined,
+      bullet: line.type === 'bullet' ? { level: 0 } : undefined,
+      spacing: { before: line.type === 'section' ? 180 : 0, after: line.type === 'name' ? 90 : 55 },
+      children: [new TextRun({
+        text: line.text,
+        font: 'Aptos',
+        size: line.type === 'name' ? 34 : line.type === 'section' ? 21 : 20,
+        bold: line.type === 'name' || line.type === 'section',
+      })],
+    }));
 
     const docx = new Document({
-      sections: [{ properties: {}, children: paragraphs }],
+      sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: paragraphs }],
     });
 
     const blob = await Packer.toBlob(docx);
@@ -94,7 +123,7 @@ export default function OutputPanel({ result, loading, loadingPhase }) {
               <span className="resume-modal-title">Tailored Resume</span>
               <button className="resume-modal-close" onClick={() => setExpanded(false)}>✕ Close</button>
             </div>
-            <pre className="resume-modal-body">{result.transformedResume}</pre>
+            <ResumePreview text={result.transformedResume} className="resume-modal-body" />
           </div>
         </div>
       )}
@@ -162,7 +191,7 @@ export default function OutputPanel({ result, loading, loadingPhase }) {
           )}
 
           {!loading && hasResult && tab === 'resume' && (
-            <pre className="output-text">{result.transformedResume}</pre>
+            <ResumePreview text={result.transformedResume} className="output-text" />
           )}
 
           {!loading && hasResult && tab === 'analysis' && (

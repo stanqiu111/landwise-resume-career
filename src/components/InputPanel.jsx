@@ -60,7 +60,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
           <span className="label-badge">1</span> Your Resume
         </label>
 
-        {!resume ? (
+        {!resume && (
           <div
             className={`drop-zone${dragging ? ' drag-over' : ''}${uploading ? ' uploading' : ''}`}
             onClick={() => fileInputRef.current?.click()}
@@ -85,18 +85,23 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
               </>
             )}
           </div>
-        ) : (
-          <div className="resume-preview-wrap">
+        )}
+        {resume && (
             <div className="resume-preview-bar">
               <span className="file-name">✓ {fileName || 'Resume loaded'}</span>
               <button className="clear-btn" onClick={clearResume}>✕ Remove</button>
             </div>
-            <textarea
-              className="text-area resume-text"
-              value={resume}
-              onChange={(e) => setResume(e.target.value)}
-              spellCheck={false}
-            />
+        )}
+        <textarea
+          className="text-area resume-text"
+          aria-label="Your resume text"
+          placeholder="Or paste your resume text here..."
+          value={resume}
+          onChange={(e) => setResume(e.target.value)}
+          spellCheck={false}
+        />
+        {resume && (
+          <div className="resume-preview-wrap">
             <div className="char-count">{resume.length} chars — you can edit the text above</div>
             <ResumeAnalysis analysis={analysis} analyzing={analyzing} />
           </div>
