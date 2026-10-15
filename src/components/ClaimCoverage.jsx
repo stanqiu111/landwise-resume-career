@@ -1,7 +1,7 @@
 export default function ClaimCoverage({ coverage }) {
   const getColor = (pct) => {
     if (pct >= 85) return 'var(--success)';
-    if (pct >= 60) return '#facc15';
+    if (pct >= 60) return 'var(--warn)';
     return 'var(--error)';
   };
 

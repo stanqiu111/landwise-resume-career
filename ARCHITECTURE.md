@@ -1,225 +1,66 @@
 # Landwise — Architecture & Workflow
 
-## User Flow
+## Account connection
 
-```
-Upload / paste resume  →  Paste job description  →  Click Transform  →  View results
-```
+The local app uses **Continue with ChatGPT** and an eligible user-authorized plan, without provider API keys. `server/chatgpt-auth.js` implements loopback OAuth, PKCE, verified identity, protected local registration storage, refresh, and sign-out. `server/chatgpt-inference.js` lists the account's models and reads Responses API streams with `store: false`; it returns only completed responses.
 
----
+The API binds to `127.0.0.1`. AI requests require a local session, exact app origin and CSRF header. The browser explicitly starts inference when the user clicks Analyze or Transform. Typing and sign-in never start inference. Account switching, sign-out and Cancel abort ongoing work. A publicly hosted service needs a separately approved integration; see README.
 
-## Technical Flow
+## Input and results
 
-### 1. Resume Input (`InputPanel.jsx`)
+Users paste text or upload a PDF to `POST /api/parse-pdf`. PDF parsing happens locally and returns text plus the original page count, without synthetic page-number markers. A PDF's page count becomes the default output limit. Pasted text is estimated using the standard export layout; the user can adjust the page limit. They add a job description, select an account model and click Transform.
 
-Two paths:
+The result has three tabs: Resume, Analysis and Claims. The resume is copyable, expandable and downloadable as PDF or DOCX. Exports are generated in the browser. Analysis shows supported keywords, skill gaps and changes; Claims shows evidence coverage.
 
-**PDF upload** — user drops or clicks a file. The browser posts the raw binary to `POST /api/parse-pdf`. The server uses `pdf-parse` (`PDFParse` class) to extract plain text from the buffer, and sends `{ text }` back. The extracted text fills the editable textarea.
+## Transform pipeline
 
-**Paste** — user types or pastes directly into the textarea. No server call needed.
+`POST /api/transform` accepts `{ resume, jobDescription, model, maxPages }`. Deterministic input checks reject short or non-text job descriptions and invalid page limits before provider calls.
 
----
+`server/transform.js` normally makes three sequential AI calls:
 
-### 2. Click Transform (`App.jsx → server.js`)
+1. **Combined extraction:** one call validates and analyzes the job description, extracts requirements and extracts resume facts with exact source quotations. Local grounding accepts only quotations present in the original resume; the job description never serves as candidate evidence.
+2. **Matching:** matches job requirements to the verified claim bank. Local checks discard invented claim IDs and unsupported source quotations, and derive coverage from remaining valid matches.
+3. **Writing:** generates the complete tailored resume using the full original resume, verified claims, job analysis and locally retrieved relevant sections.
 
-`handleTransform` in `App.jsx` validates both fields aren't empty, starts a `setInterval` that cycles through five loading phase labels every 3.5s (for UI feedback), then fires:
+Local final checks reject missing contact details, omitted education and invented numbers. Invalid output produces a visible error rather than an empty success response. Retrieval uses local TF-IDF and makes no external calls.
 
-```
-POST /api/transform  { resume, jobDescription }
-```
+The writer receives the page limit and a source-based word budget. `src/resumeLayout.js` measures the actual wrapped text on Letter pages with 11 pt body text, or a compact 10.5 pt layout. If a draft exceeds the limit, one additional sequential editing call tightens it. The revised draft must pass the same factual and page checks; remaining overflow returns `resume_too_long`. Text is never truncated to fit. Results include the verified `pageCount` and `pageLimit`.
 
-The backend runs a **5-phase AI pipeline**:
+PDF export uses the exact same layout calculation as server validation and refuses overflow. DOCX uses the same wrapped lines, page size, margins, fixed line spacing and explicit page breaks. Its pagination is verified in LibreOffice for representative fixtures; changing fonts, editing content or opening it in another word processor can reflow it. The PDF is the fixed-pagination format.
 
----
+The original resume is the only source of candidate facts. Job requirements guide emphasis and never establish candidate experience. Prompts preserve identifying history and prohibit invented skills, achievements and metrics.
 
-### Phase 0 — Deterministic Pre-check (free, instant)
+## Progress, cancellation and diagnosis
 
-Before touching the LLM, the server rejects obviously bad input:
-- JD shorter than 50 chars
-- JD is only digits
-- JD is less than 40% alphabetic characters
+The UI requests `Accept: application/x-ndjson`. `server/transform-progress.js` streams actual running/completed/failed stages, elapsed time and five-second heartbeats, followed by one terminal result or error. Other clients can continue receiving a regular JSON response. `src/transformResponse.js` handles fragmented updates, connection interruption and empty results.
 
----
+The UI does not simulate progress. Analyze and Transform are mutually exclusive. A server guard also prevents overlapping actions from different tabs using the same authenticated account. It displays a Cancel control and persistent errors. A failed retry keeps the previous result and inputs. Expired session errors refresh the connection without reloading the form.
 
-### Phase 0.5 — LLM Semantic Validation (Claude Haiku)
+`server/request-deadline.js` bounds the full operation, including response-body streaming:
 
-Sends the job description to Haiku with a yes/no prompt:
-*"Is this a real job description?"*
-Returns `{ valid: true }` or `{ valid: false, reason: "…" }`.
-If invalid → 400 error back to the user immediately, no further API calls.
+- Each provider inference call: 120 seconds.
+- Entire Transform, including connection and all calls: 240 seconds.
+- Browser fallback deadline: 250 seconds.
 
----
+Deadlines and browser disconnects abort provider work. Provider failures are not retried automatically. The optional length-editing pass stays within the overall deadline. Temporary HTTP or streamed rate limits preserve Retry-After guidance and pause new requests for that account, with a 60-second fallback pause if no delay is supplied. The browser displays a cooldown countdown; it does not retry automatically. Plan allowance exhaustion remains separate and links to ChatGPT Manage usage. These are maximum waits, not promised generation times.
 
-### Phase 1 — JD Structured Analysis (Claude Sonnet)
+Server logs contain only `transform_step`, `transform_complete` or `transform_failed` events with a request ID, step/status or error code, and elapsed milliseconds. They never contain prompts, resume text, provider output or credentials. The timers cover model discovery, combined extraction, matching, writing, optional shortening and final checks. The animated Read, Match, Build and Check cards follow these events; decorative animation never advances completion.
 
-Extracts structured data from the job description:
+## Local services and source map
 
-```json
-{
-  "roleTitle": "Senior Python Engineer",
-  "roleLevel": "senior",
-  "requiredSkills": ["Python", "AWS", "microservices"],
-  "niceToHaveSkills": ["Kafka", "Scala"],
-  "mustHaveKeywords": ["Python", "backend", "cloud"]
-}
-```
+- React/Vite: `http://127.0.0.1:5174`; proxies `/api` to Express on port 3001.
+- `server.js`: API routes, input validation and request lifecycle.
+- `server/chatgpt-auth.js`: account connection and protected credentials.
+- `server/chatgpt-inference.js`: model discovery and complete response streams.
+- `server/transform.js`: sequential extraction, matching and tailoring.
+- `server/transform-progress.js`: stage timing and progress response.
+- `server/request-deadline.js`: cancellation and full-operation deadlines.
+- `server/rag.js`: local resume retrieval.
+- `server/schemas.js`, `server/resume-quality.js`, `server/prompts.js`: evidence and output rules.
+- `src/App.jsx`, `src/transformResponse.js`: request state, progress, cancellation and errors.
+- `src/components/InputPanel.jsx`, `OutputPanel.jsx`: input, preview and exports.
+- `src/resumeLayout.js`, `src/resumeDocx.js`: shared pagination, PDF and Word exports.
 
-Output guardrail: if `requiredSkills` is empty and `roleTitle` is blank, the JD wasn't parseable — returns a 400.
+## Verification
 
----
-
-### Phase 1.25 — Embedding RAG (in-memory vector retrieval)
-
-After the JD is parsed, the resume is chunked and the most relevant sections are retrieved for writing emphasis.
-
-**How it works:**
-
-1. `chunkResume(text)` splits the resume on recognised section headers (Summary, Experience, Skills, Education, Projects, …). Falls back to paragraph-level chunks if no headers are detected.
-2. `buildRetrievalIndex(chunks)` embeds every chunk with **OpenAI `text-embedding-3-small`** and builds an in-memory `VectorIndex` (an array of `{chunk, embedding: number[]}` entries).
-3. All JD requirement strings (roleTitle, requiredSkills, niceToHaveSkills, mustHaveKeywords) are embedded in a **single batched call**.
-4. For each query embedding, cosine similarity against all chunk embeddings returns the top-K chunks. Results are de-duplicated across all queries.
-5. Retrieved chunks provide relevance hints for Phase 2. Claim extraction and the final writer also receive the complete original resume, so contact details and sections with fewer job keywords are not lost.
-
-**Why embeddings over TF-IDF:**
-TF-IDF requires exact or near-exact word overlap. Embeddings capture semantic meaning, so "React developer" retrieves chunks mentioning "frontend engineering", "component architecture", or "UI work" even if "React" isn't in those sections. This produces better claim coverage on semantically rich JDs.
-
-**Fallback behaviour:**
-If `OPENAI_API_KEY` is not set, or if the embedding API call fails at runtime, `buildRetrievalIndex` automatically falls back to the original TF-IDF index. The transform flow continues uninterrupted — the only difference is retrieval quality. The index exposes its active strategy as `type` (`'embedding'` or `'tfidf'`).
-
-**Swap guide:**
-To replace OpenAI with Voyage AI, Cohere, or a local model, edit `server/embeddings.js` only — change the `embedBatch` implementation. Nothing in `server/rag.js` or `server.js` needs to change. To add a persistent vector database (Qdrant, Pinecone, Chroma, Supabase pgvector), implement `VectorIndex` with the same `.query(embedding, topK)` interface backed by the DB client.
-
-### Phase 1.5 — Claim Extraction & Matching (Claude Haiku × 3, 2 in parallel)
-
-This is the hallucination-prevention layer. Two calls run in parallel:
-
-**Call A** — Resume claim extraction from the full original resume:
-Every verifiable fact in the resume becomes a typed claim:
-```json
-{ "id": "c1", "text": "Reduced latency by 40%", "type": "metric", "raw_phrase": "..." }
-```
-
-**Call B** — JD requirement extraction:
-Every requirement from the JD becomes a structured requirement:
-```json
-{ "id": "req1", "text": "5+ years Python", "type": "skill", "priority": "must_have", "keywords": ["Python"] }
-```
-
-**Call C** (after A+B complete) — Matching:
-Links each requirement to the best-matching resume claims:
-```json
-{
-  "matches": [{ "requirement_id": "req1", "claim_ids": ["c3"], "match_type": "exact", "confidence": 0.9 }],
-  "unsupported_requirements": ["Blockchain experience"]
-}
-```
-
-Coverage score:
-```
-claim_coverage = covered_requirements / total_requirements × 100
-```
-
----
-
-### Phase 2 — Resume Tailoring (Claude Sonnet)
-
-The final rewrite call receives:
-- The structured JD analysis (Phase 1)
-- The full claim analysis (Phase 1.5) — what the resume has vs. what the JD needs
-- The full original resume text and retrieved evidence to emphasize
-
-The system prompt explicitly forbids fabrication, requires conventional sections and short readable bullets, and treats the original resume as the only source of candidate facts. A deterministic check rejects omitted email/education and new numbers. Returns:
-
-```json
-{
-  "transformedResume": "...full rewritten text...",
-  "matchScore": 82,
-  "keywordsAdded": ["microservices", "CI/CD"],
-  "missingSkills": ["Java", "Spring Boot"],
-  "improvements": ["Quantified AWS experience", "Added STAR format to leadership bullet"]
-}
-```
-
-The server merges `claim_coverage`, `unsupported_requirements`, and the claim/match arrays into this result and sends everything back.
-
----
-
-### 3. Display (`OutputPanel.jsx`)
-
-The result renders across three tabs:
-
-| Tab | Content |
-|-----|---------|
-| **Resume** | Full tailored resume as plain text — copyable, expandable, downloadable as PDF or DOCX |
-| **Analysis** | Match score ring, keywords added (green chips), skills gap (yellow chips), list of changes made |
-| **Claims** | Requirement coverage % with bar, list of JD requirements not backed by the resume |
-
-**PDF export** — rendered client-side with `jsPDF`, paged manually by tracking `y` position.
-
-**DOCX export** — built client-side with the `docx` library, each line becomes a `Paragraph`, packed to blob and downloaded.
-
----
-
-## Architecture Diagram
-
-```
-Browser (React/Vite :5175)
-   │
-   ├── POST /api/parse-pdf  ──►  pdf-parse (Node)  ──►  plain text
-   │
-   └── POST /api/transform  ──►  Express (:3001)
-                                   │
-                                   ├── Phase 0:    deterministic guards (instant)
-                                   ├── Phase 0.5:  Haiku  — is this a real JD?
-                                   ├── Phase 1:    Sonnet — parse JD structure
-                                   ├── Phase 1.25: Embedding RAG
-                                   │               ├── chunkResume → section chunks
-                                   │               ├── embedBatch(chunks)   → OpenAI (or TF-IDF fallback)
-                                   │               ├── embedBatch(queries)  → OpenAI (or TF-IDF fallback)
-                                   │               └── cosine similarity → relevant chunks
-                                   ├── Phase 1.5:  Haiku×2 parallel — extract resume claims + JD requirements
-                                   │               Haiku×1 serial   — match claims → requirements
-                                   └── Phase 2:    Sonnet — rewrite resume using claim bank
-```
-
----
-
-## File Map
-
-```
-resume-transformer/
-├── server.js              # Express API — all AI pipeline logic lives here
-├── server/
-│   ├── embeddings.js      # OpenAI embeddings client (swap here to change provider)
-│   ├── rag.js             # chunkResume, VectorIndex, buildRetrievalIndex, TF-IDF fallback
-│   └── schemas.js         # Zod schemas: ClaimSchema, JDRequirementSchema, ClaimMatchSchema
-├── src/
-│   ├── App.jsx            # Root component, state, handleTransform
-│   ├── App.css            # All styles
-│   ├── index.css          # #root base only
-│   ├── main.jsx           # React entry point
-│   └── components/
-│       ├── InputPanel.jsx           # Resume upload + JD textarea
-│       ├── OutputPanel.jsx          # Tabs, export buttons, result display
-│       ├── ClaimCoverage.jsx        # Coverage % card + bar
-│       └── UnsupportedRequirements.jsx  # Skills gap list
-├── index.html
-├── vite.config.js         # Vite dev server, proxies /api → :3001
-└── package.json
-```
-
----
-
-## Key Design Decisions
-
-**Why multiple phases instead of one big prompt?**
-A single prompt asking Haiku/Sonnet to validate, parse, extract claims, match, and rewrite all at once produces lower-quality output and is harder to guard against hallucination. Breaking it into discrete steps lets each model call do one thing well, and lets the claim-matching step act as a factual constraint on the final rewrite.
-
-**Why Haiku for claim extraction and Sonnet for tailoring?**
-Claim extraction and matching are mechanical tasks — fast and cheap on Haiku. The final resume rewrite requires nuance, tone, and STAR-format reasoning, so Sonnet is used there and for the structured JD analysis.
-
-**Why are the claim + JD extraction calls parallelized?**
-They take completely independent inputs (resume vs. job description) so there is no reason to run them sequentially. Running both at once with `Promise.all` cuts roughly one full Haiku round-trip off the total latency.
-
-**Why validate the JD before the heavy calls?**
-The deterministic pre-check (Phase 0) catches garbage input with zero latency and zero API cost. The Haiku semantic check (Phase 0.5) catches plausible-looking non-JD text cheaply before Sonnet is invoked.
+`npm test` covers authentication, stream assembly, stalled streams after headers, deadline cancellation, sequential extraction, streamed progress, terminal errors, evidence preservation, PDF upload counts, one- and two-page exports, content retention and bounded overflow recovery. `npm run lint` and `npm run build` check the source and browser bundle. Live timing checks use a synthetic resume to avoid retaining personal input in diagnostics.

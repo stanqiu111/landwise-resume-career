@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import ResumeAnalysis from './ResumeAnalysis';
 
-export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing }) {
+export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [fileName, setFileName] = useState('');
@@ -25,7 +25,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
       const res = await fetch('/api/parse-pdf', { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setResume(data.text);
+      setResume(data.text, { pageCount: data.pageCount });
     } catch (err) {
       setUploadError(err.message || 'Failed to read PDF.');
       setFileName('');
@@ -63,7 +63,16 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
         {!resume && (
           <div
             className={`drop-zone${dragging ? ' drag-over' : ''}${uploading ? ' uploading' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-label="Upload your resume as a PDF"
             onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
@@ -79,7 +88,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
               <><span className="spinner dark" /> Reading PDF...</>
             ) : (
               <>
-                <span className="drop-icon">📄</span>
+                <span className="drop-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" /><path d="M14 2v6h6M12 17v-5m-3 3 3-3 3 3" /></svg></span>
                 <span className="drop-text">Click to upload or drag & drop</span>
                 <span className="drop-hint">PDF only · max 10 MB</span>
               </>
@@ -103,6 +112,20 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
         {resume && (
           <div className="resume-preview-wrap">
             <div className="char-count">{resume.length} chars — you can edit the text above</div>
+            <div className="resume-length-control">
+              <label htmlFor="resume-page-limit">Output length
+                <select id="resume-page-limit" value={maxPages} disabled={aiBusy} onChange={event => setMaxPages(Number(event.target.value))}>
+                  {Array.from({ length: Math.max(5, Math.min(20, maxPages)) }, (_, index) => index + 1).map(count => <option value={count} key={count}>Up to {count} {count === 1 ? 'page' : 'pages'}</option>)}
+                </select>
+              </label>
+              <span>{sourcePages ? `Original PDF: ${sourcePages} ${sourcePages === 1 ? 'page' : 'pages'}.` : 'Estimated from pasted text. Adjust to match your original.'}</span>
+            </div>
+            <div className="resume-analysis-action">
+              <button onClick={onAnalyze} disabled={!aiReady || analyzing || aiBusy || retryIn > 0}>
+                {analyzing ? 'Analyzing…' : 'Analyze my resume'}
+              </button>
+              <span>{retryIn > 0 ? `Try again in ${retryIn}s.` : aiBusy ? 'Wait for Transform to finish, or cancel it.' : aiReady ? 'Uses your ChatGPT plan when you click.' : 'Connect your ChatGPT plan to get feedback.'}</span>
+            </div>
             <ResumeAnalysis analysis={analysis} analyzing={analyzing} />
           </div>
         )}
@@ -117,6 +140,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
         </label>
         <textarea
           className="text-area"
+          aria-label="Job description"
           placeholder="Paste the job posting or description here..."
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { jsPDF } from 'jspdf';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { resumePDF, estimateResumePages } from '../resumeLayout';
+import { resumeDOCXBlob } from '../resumeDocx';
 import ClaimCoverage from './ClaimCoverage';
 import UnsupportedRequirements from './UnsupportedRequirements';
+import TransformActivity from './TransformActivity';
 import { parseResumeLines } from '../resumeDocument';
 
 function ResumePreview({ text, className = '' }) {
@@ -17,7 +18,7 @@ function ResumePreview({ text, className = '' }) {
 }
 
 function MatchScore({ score }) {
-  const color = score >= 75 ? 'var(--success)' : score >= 50 ? '#facc15' : 'var(--error)';
+  const color = score >= 75 ? 'var(--success)' : score >= 50 ? 'var(--warn)' : 'var(--error)';
   const label = score >= 75 ? 'Strong Match' : score >= 50 ? 'Moderate Match' : 'Weak Match';
   return (
     <div className="match-score-wrap">
@@ -32,10 +33,11 @@ function MatchScore({ score }) {
   );
 }
 
-export default function OutputPanel({ result, loading, loadingPhase }) {
+export default function OutputPanel({ result, loading, progress, error, retryIn = 0 }) {
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState('resume');
   const [expanded, setExpanded] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     if (!expanded) return;
@@ -51,64 +53,27 @@ export default function OutputPanel({ result, loading, loadingPhase }) {
   }
 
   function handleDownloadPDF() {
-    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-    const margin = 48;
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    let y = margin;
-    for (const line of parseResumeLines(result.transformedResume)) {
-      const isName = line.type === 'name';
-      const isSection = line.type === 'section';
-      const isBullet = line.type === 'bullet';
-      const size = isName ? 17 : isSection ? 10.5 : 10;
-      const lineHeight = isName ? 21 : 14;
-      const before = isSection ? 12 : isName ? 0 : 2;
-      const left = margin + (isBullet ? 13 : 0);
-      doc.setFont('helvetica', isName || isSection ? 'bold' : 'normal');
-      doc.setFontSize(size);
-      const wrapped = doc.splitTextToSize(line.text, pageWidth - margin - left);
-      if (y + before + wrapped.length * lineHeight > pageHeight - margin) {
-        doc.addPage(); y = margin;
-      }
-      y += before;
-      if (isBullet) doc.text('•', margin + 2, y);
-      for (const part of wrapped) {
-        doc.text(part, left, y);
-        y += lineHeight;
-      }
-      if (isSection) {
-        doc.setDrawColor(175, 184, 196);
-        doc.line(margin, y - 9, pageWidth - margin, y - 9);
-        y += 2;
-      }
+    try {
+      setExportError('');
+      resumePDF(result.transformedResume, result.pageLimit ?? estimateResumePages(result.transformedResume)).save('tailored-resume.pdf');
+    } catch (error) {
+      setExportError(error.message);
     }
-    doc.save('tailored-resume.pdf');
   }
 
   async function handleDownloadDOCX() {
-    const paragraphs = parseResumeLines(result.transformedResume).map(line => new Paragraph({
-      heading: line.type === 'section' ? HeadingLevel.HEADING_2 : undefined,
-      bullet: line.type === 'bullet' ? { level: 0 } : undefined,
-      spacing: { before: line.type === 'section' ? 180 : 0, after: line.type === 'name' ? 90 : 55 },
-      children: [new TextRun({
-        text: line.text,
-        font: 'Aptos',
-        size: line.type === 'name' ? 34 : line.type === 'section' ? 21 : 20,
-        bold: line.type === 'name' || line.type === 'section',
-      })],
-    }));
-
-    const docx = new Document({
-      sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: paragraphs }],
-    });
-
-    const blob = await Packer.toBlob(docx);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tailored-resume.docx';
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      setExportError('');
+      const blob = await resumeDOCXBlob(result.transformedResume, result.pageLimit ?? estimateResumePages(result.transformedResume));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tailored-resume.docx';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setExportError(error.message);
+    }
   }
 
   const hasResult = result && result.transformedResume;
@@ -164,28 +129,29 @@ export default function OutputPanel({ result, loading, loadingPhase }) {
               <button className="download-btn" onClick={handleDownloadPDF}>
                 ↓ PDF
               </button>
-              <button className="download-btn" onClick={handleDownloadDOCX}>
+              <button className="download-btn" onClick={handleDownloadDOCX} title="Editable Word document. Fonts and later edits can change pagination.">
                 ↓ DOCX
               </button>
             </div>
           )}
         </div>
 
+        {!loading && error && <div className="transform-error" role="alert">
+          <strong>Transform didn’t finish</strong>
+          <p>{error.message}</p>
+          {retryIn > 0 && <p>Retry available in {retryIn}s. Your resume and job description are still here.</p>}
+          {error.manageUsage && <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Manage ChatGPT usage ↗</a>}
+        </div>}
+        {!loading && !error && hasResult && progress?.complete && <p className="transform-duration">Ready in {Math.round(progress.elapsedMs / 1000)} seconds</p>}
+        {!loading && hasResult && result.pageCount && <p className="resume-page-count">{result.pageCount} {result.pageCount === 1 ? 'page' : 'pages'} · Within your {result.pageLimit}-page limit</p>}
+        {exportError && <p className="upload-error" role="alert">{exportError}</p>}
         <div className={`output-area${loading ? ' output-loading' : ''}`}>
-          {loading && (
-            <div className="output-placeholder">
-              <div className="pulse-dots">
-                <span className="pulse-dot" />
-                <span className="pulse-dot" />
-                <span className="pulse-dot" />
-              </div>
-              <p className="loading-label">{loadingPhase}</p>
-            </div>
-          )}
+          {loading && <TransformActivity progress={progress} />}
 
-          {!loading && !hasResult && (
+          {!loading && !hasResult && !error && (
             <div className="output-placeholder empty">
-              <span className="empty-icon">✦</span>
+              <div className="empty-document" aria-hidden="true"><span className="empty-document-star">✦</span><span /><span /><span /><span /></div>
+              <strong>Your next chapter, on paper.</strong>
               <p>Your tailored resume will appear here after you click Transform.</p>
             </div>
           )}

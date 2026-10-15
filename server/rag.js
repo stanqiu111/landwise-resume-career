@@ -1,23 +1,4 @@
-/**
- * Resume chunking + retrieval
- *
- * Public API consumed by server.js:
- *   chunkResume(text)           → Chunk[]
- *   buildRetrievalIndex(chunks) → Promise<RetrievalIndex>
- *
- * A RetrievalIndex exposes:
- *   index.type                              → 'embedding' | 'tfidf'
- *   index.retrieve(queries, topKPerQuery)   → Promise<Chunk[]>
- *
- * Strategy selection (automatic):
- *   1. Embedding-based (OpenAI) — if OPENAI_API_KEY is present and the call succeeds
- *   2. TF-IDF fallback          — if the key is absent or any embedding call fails
- *
- * The TF-IDF functions are kept as named exports so they remain usable in tests
- * and as an explicit fallback path.
- */
-
-import { embedBatch } from './embeddings.js';
+/** Resume retrieval runs locally and does not consume API or ChatGPT usage. */
 
 // ─── Chunking ────────────────────────────────────────────────────────────────
 
@@ -139,94 +120,11 @@ export function retrieveForRequirements(requirements, chunks, tfidf, topKPerReq 
   return result;
 }
 
-// ─── Embedding-based vector index ────────────────────────────────────────────
-
-function cosineEmbed(a, b) {
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na  += a[i] * a[i];
-    nb  += b[i] * b[i];
-  }
-  return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
-}
-
-class VectorIndex {
-  constructor(chunks, embeddings) {
-    this._entries = chunks.map((chunk, i) => ({ chunk, embedding: embeddings[i] }));
-  }
-
-  /** Returns top-K chunks most similar to queryEmbedding (number[]). */
-  query(queryEmbedding, topK = 4) {
-    return this._entries
-      .map(({ chunk, embedding }) => ({ chunk, score: cosineEmbed(queryEmbedding, embedding) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK)
-      .map(e => e.chunk);
-  }
-}
-
-// ─── Public retrieval API ─────────────────────────────────────────────────────
-
-/**
- * Build a retrieval index over the given resume chunks.
- * Attempts embedding-based indexing first; silently falls back to TF-IDF.
- *
- * Usage in server.js:
- *   const index = await buildRetrievalIndex(chunks);
- *   const relevant = await index.retrieve(queries, 3);
- *
- * @param {Array<{title: string, content: string}>} chunks
- * @returns {Promise<{type: string, retrieve: Function}>}
- */
+// Use local TF-IDF retrieval; ChatGPT plan access covers Responses, not embeddings.
 export async function buildRetrievalIndex(chunks) {
-  const chunkTexts = chunks.map(c => `${c.title}\n${c.content}`);
-  const chunkEmbeddings = await embedBatch(chunkTexts);
-
-  if (chunkEmbeddings && chunkEmbeddings.length === chunks.length) {
-    const vecIndex = new VectorIndex(chunks, chunkEmbeddings);
-
-    return {
-      type: 'embedding',
-
-      async retrieve(queries, topKPerQuery = 3) {
-        if (!queries.length) return chunks;
-
-        const queryEmbeddings = await embedBatch(queries);
-        if (!queryEmbeddings) {
-          // Embedding call failed mid-flight — fall back to TF-IDF for this request
-          console.warn('[rag] Query embedding failed; falling back to TF-IDF');
-          const tfidf = buildTfidf(chunks);
-          return retrieveForRequirements(queries, chunks, tfidf, topKPerQuery);
-        }
-
-        const seen = new Set();
-        const result = [];
-        for (const qEmb of queryEmbeddings) {
-          for (const chunk of vecIndex.query(qEmb, topKPerQuery)) {
-            const key = `${chunk.title}\0${chunk.content}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              result.push(chunk);
-            }
-          }
-        }
-        return result.length ? result : chunks;
-      },
-    };
-  }
-
-  // OPENAI_API_KEY absent or embedBatch returned null/wrong-length
-  if (chunkEmbeddings === null) {
-    console.log('[rag] OPENAI_API_KEY not set — using TF-IDF retrieval');
-  } else {
-    console.warn('[rag] Embedding count mismatch — using TF-IDF retrieval');
-  }
-
   const tfidf = buildTfidf(chunks);
   return {
     type: 'tfidf',
-
     async retrieve(queries, topKPerQuery = 3) {
       return queries.length
         ? retrieveForRequirements(queries, chunks, tfidf, topKPerQuery)

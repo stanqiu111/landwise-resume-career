@@ -1,0 +1,68 @@
+.transform-workbench {
+  flex: 1;
+  padding: 24px;
+  background: radial-gradient(ellipse at 50% 25%, #f5efff 0, #fff 62%);
+  color: var(--text);
+  min-width: 0;
+}
+.workbench-topline, .workbench-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.workbench-eyebrow { display: flex; align-items: center; gap: 7px; color: var(--accent); font-size: .67rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.workbench-eyebrow > span { font-size: 1rem; }
+.workbench-live { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: .65rem; }
+.workbench-live i { width: 5px; height: 5px; border-radius: 50%; background: #a680d8; box-shadow: 0 0 0 3px #f1eafa; }
+.workbench-art { height: 222px; position: relative; display: grid; place-items: center; max-width: 380px; margin: 6px auto 0; }
+.workbench-orbit { position: absolute; width: 208px; height: 208px; border: 1px dashed #e0d3f3; border-radius: 50%; }
+.workbench-paper { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; width: 118px; height: 158px; padding: 19px 16px; background: #fff; border: 1px solid #dacbed; border-radius: 9px; box-shadow: 5px 6px 0 #ede4fa, 0 14px 32px #7241ad12; transform: rotate(-5deg); animation: workbench-float 5s ease-in-out infinite; }
+.workbench-paper-star { color: var(--accent); font-size: 1.1rem; line-height: 1; }
+.workbench-paper-heading { width: 64%; height: 5px; background: #b59ad9; border-radius: 3px; }
+.workbench-paper-line { height: 3px; min-height: 3px; width: 100%; background: #e8dff4; border-radius: 3px; transform-origin: left; }
+.workbench-paper-line.short { width: 62%; }
+.workbench-paper-divider { height: 2px; }
+.workbench-scan { position: absolute; left: 0; right: 0; height: 32px; top: 0; border-bottom: 1px solid #ac7bec; background: linear-gradient(transparent, #be96f127); animation: workbench-scan 3.6s ease-in-out infinite; }
+.workbench-float { position: absolute; display: flex; align-items: center; gap: 7px; padding: 10px 12px; background: #ffffffed; border: 1px solid #e8def5; border-radius: 9px; box-shadow: 0 5px 16px #51317709; color: #6f578c; font-size: .62rem; white-space: nowrap; animation: workbench-float 5s ease-in-out infinite; }
+.workbench-float svg { width: 16px; height: 16px; color: #9460d3; }
+.workbench-source { left: 0; top: 54px; transform: rotate(-5deg); }
+.workbench-target { right: 0; bottom: 41px; animation-delay: -2.5s; }
+.workbench-spark { position: absolute; top: 28px; right: 51px; font-size: 1.7rem; color: #bc9ce4; }
+.workbench-writing .workbench-paper-line { animation: workbench-write 2.8s ease-in-out infinite; animation-delay: calc(var(--line, 0) * .24s); }
+.workbench-writing .workbench-scan { display: none; }
+.workbench-matching .workbench-float { border-color: #cbb0ec; }
+.workbench-checking .workbench-paper-line { background: #cde7da; }
+.workbench-caption { text-align: center; }
+.workbench-caption h3 { font-size: clamp(1.1rem, 1.5vw, 1.35rem); font-weight: 600; letter-spacing: -.035em; line-height: 1.3; }
+.workbench-note { font-size: .76rem; color: var(--text-muted); line-height: 1.65; max-width: 310px; min-height: 42px; margin: 9px auto 22px; animation: workbench-appear .4s ease-out; }
+.workbench-tasks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; list-style: none; }
+.workbench-task { display: flex; position: relative; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: #ffffffb3; transition: background .3s, border-color .3s; }
+.workbench-task-icon { width: 29px; height: 29px; display: grid; place-items: center; flex-shrink: 0; color: #8c8497; background: #f6f4f8; border-radius: 7px; }
+.workbench-task-icon svg { width: 17px; height: 17px; }
+.workbench-task-copy { display: flex; flex-direction: column; gap: 3px; }
+.workbench-task-copy strong { font-size: .76rem; font-weight: 600; }
+.workbench-task-copy > span { font-size: .6rem; color: var(--text-muted); }
+.workbench-task-state { display: flex; align-items: center; gap: 5px; width: 100%; font-size: .58rem; color: var(--text-muted); padding-left: 37px; }
+.workbench-task-state > span:empty { display: none; }
+.workbench-task.is-running { border-color: #c2a2eb; background: #f7f2ff; box-shadow: 0 2px 7px #7c3aed08; }
+.workbench-task.is-running .workbench-task-icon { color: var(--accent); background: #eaddfb; }
+.workbench-task.is-running .workbench-task-state { color: var(--accent); }
+.workbench-task-pulse { display: block; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: workbench-breathe 1.8s ease-in-out infinite; }
+.workbench-task.is-completed .workbench-task-icon { color: var(--success); background: #edf7f1; }
+.workbench-task.is-completed .workbench-task-state { color: var(--success); }
+.workbench-footer { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: .6rem; line-height: 1.6; flex-wrap: wrap; }
+.workbench-time { font-variant-numeric: tabular-nums; color: var(--text-dim); font-weight: 600; }
+@keyframes workbench-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+@keyframes workbench-scan { 0%, 100% { translate: 0 -32px; opacity: 0; } 10%, 80% { opacity: 1; } 90% { translate: 0 158px; opacity: 0; } }
+@keyframes workbench-write { 0%, 100% { scale: 1 1; } 40% { scale: .55 1; } }
+@keyframes workbench-appear { from { opacity: 0; translate: 0 3px; } to { opacity: 1; translate: 0 0; } }
+@keyframes workbench-breathe { 50% { opacity: .35; } }
+@media (max-width: 500px) {
+  .transform-workbench { padding: 20px 16px; }
+  .workbench-art { height: 208px; }
+  .workbench-source { left: -5px; padding: 8px; }
+  .workbench-target { right: -5px; padding: 8px; }
+  .workbench-task { padding: 10px; gap: 7px; }
+  .workbench-task-copy > span { display: none; }
+  .workbench-task-state { padding-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transform-workbench *, .transform-workbench *::before { animation: none !important; transition: none !important; }
+  .workbench-scan { display: none; }
+}
