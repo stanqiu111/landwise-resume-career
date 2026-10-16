@@ -195,3 +195,8 @@
 .fit-group > summary h3 { display: inline; }
 .fit-group > .analysis-note { margin: 9px 0; }
 .fit-group > .fit-item + .fit-item { margin-top: 10px; }
+
+.result-follow-up { border-top: 1px solid var(--border); scroll-margin-top: 24px; }
+.saved-follow-up { padding: 24px; }
+.saved-follow-up h3 { font-size: 16px; }
+.saved-follow-up p { margin: 10px 0 16px; font-size: 12px; line-height: 1.7; color: var(--text-dim); }

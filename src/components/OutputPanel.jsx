@@ -31,13 +31,14 @@ function documentFilename(text, job) {
   return `${slug || 'tailored'}-resume`;
 }
 
-export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false }) {
+export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false, revising = false, children }) {
   const [copyState, setCopyState] = useState('');
   const [tab, setTab] = useState('resume');
   const [expanded, setExpanded] = useState(false);
   const [exportError, setExportError] = useState('');
   const [exporting, setExporting] = useState(false);
   const dialogRef = useRef(null);
+  const followUpRef = useRef(null);
   const copyTimer = useRef(null);
   const id = useId();
   const resumeText = result?.transformedResume || '';
@@ -112,7 +113,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
     event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next].focus();
   }
 
-  const caption = loading ? 'Working with your experience. Follow the progress below.'
+  const caption = revising ? 'Refining your draft. Your current version stays available below.' : loading ? 'Working with your experience. Follow the progress below.'
     : hasResult ? 'Your tailored draft is ready. Review, then download.'
       : 'Your experience, shaped for the role you want.';
 
@@ -124,7 +125,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
         <p className="result-caption">{caption}</p>
       </div>
       <span className={`result-status${loading ? ' is-working' : ''}`}>
-        {loading ? 'In progress' : stale && hasResult ? 'Inputs changed' : hasResult ? 'Draft ready' : 'Ready when you are'}
+        {revising ? 'Refining draft' : loading ? 'In progress' : stale && hasResult ? 'Inputs changed' : hasResult ? 'Draft ready' : 'Ready when you are'}
       </span>
     </header>
 
@@ -154,10 +155,11 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
       <div className="result-action-row">
         <span className="result-filename" title={filename}>{filename}</span>
         <div className="result-actions">
+          {children && <button type="button" disabled={loading} onClick={() => { followUpRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); followUpRef.current?.querySelector('textarea')?.focus({ preventScroll: true }); }}>Refine draft ↓</button>}
           <button type="button" onClick={() => setExpanded(true)} disabled={loading}>Full screen</button>
-          <button type="button" onClick={handleCopy} disabled={loading || copyState === 'copying'}>{copyState === 'copied' ? 'Copied' : copyState === 'copying' ? 'Copying…' : 'Copy text'}</button>
-          <button type="button" className="result-export" onClick={handleDownloadPDF} disabled={loading || exporting}>PDF</button>
-          <button type="button" className="result-export" onClick={handleDownloadDOCX} disabled={loading || exporting} title="Editable Word document. Fonts and later edits can change pagination.">{exporting ? 'Saving…' : 'DOCX'}</button>
+          <button type="button" onClick={handleCopy} disabled={loading || revising || copyState === 'copying'}>{copyState === 'copied' ? 'Copied' : copyState === 'copying' ? 'Copying…' : 'Copy text'}</button>
+          <button type="button" className="result-export" onClick={handleDownloadPDF} disabled={loading || revising || exporting}>PDF</button>
+          <button type="button" className="result-export" onClick={handleDownloadDOCX} disabled={loading || revising || exporting} title="Editable Word document. Fonts and later edits can change pagination.">{exporting ? 'Saving…' : 'DOCX'}</button>
         </div>
       </div>
       {!loading && (result.pageCount || progress?.complete) && <p className="result-meta">
@@ -167,7 +169,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
       </p>}
       <div className="result-save">
         {result.savedApplication ? <><span>Saved in your local application folder.</span><a href={`#applications/${result.savedApplication.id}`}>View application ↗</a></>
-          : <><span>{result.saveError || 'Keep this draft, its job description and fit report together.'}</span>{onSave && <button onClick={onSave} disabled={loading || saving}>{saving ? 'Saving…' : 'Save application'}</button>}</>}
+          : <><span>{result.saveError || 'Keep this draft, its job description and fit report together.'}</span>{onSave && <button onClick={onSave} disabled={loading || revising || saving}>{saving ? 'Saving…' : 'Save application'}</button>}</>}
       </div>
       <span className="result-sr-only" role="status">{copyState === 'copied' ? 'Resume copied to clipboard.' : ''}</span>
       {copyState === 'failed' && <p className="result-inline-error" role="alert">Copy wasn’t available. Open Full screen to select the text, or download your resume.</p>}
@@ -195,6 +197,8 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
         </div>}
       </div>}
     </div>
+
+    {!loading && hasResult && children && <div className="result-follow-up" ref={followUpRef}>{children}</div>}
 
     <dialog className="result-dialog" ref={dialogRef} aria-labelledby={`${id}-dialog-title`} onClose={() => setExpanded(false)} onCancel={() => setExpanded(false)} onClick={event => {
       if (event.target !== event.currentTarget) return;

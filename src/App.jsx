@@ -3,6 +3,7 @@ import InputPanel from './components/InputPanel';
 import Applications from './components/Applications';
 import { applicationRequest } from './applicationApi';
 import OutputPanel from './components/OutputPanel';
+import ResumeFollowUp from './components/ResumeFollowUp';
 import CareerEvents from './components/CareerEvents';
 import AIConnection from './components/AIConnection';
 import useAIConnection from './useAIConnection';
@@ -26,6 +27,11 @@ export default function App() {
   const [page, setPage] = useState(currentPage);
   const [applicationId, setApplicationId] = useState(() => window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
   const [saving, setSaving] = useState(false);
+  const [inputUploading, setInputUploading] = useState(false);
+  const [refining, setRefining] = useState(false);
+  const [revisionError, setRevisionError] = useState(null);
+  const [revisionProgress, setRevisionProgress] = useState(null);
+  const [followUpKey, setFollowUpKey] = useState(0);
   const [resume, setResumeRaw] = useState('');
   const [sourcePages, setSourcePages] = useState(null);
   const [pageLimitOverride, setPageLimitOverride] = useState(null);
@@ -47,6 +53,8 @@ export default function App() {
   const generationRef = useRef(0);
   const analysisRequestRef = useRef(null);
   const transformRequestRef = useRef(null);
+  const revisionRequestRef = useRef(null);
+  const staleResult = Boolean(resultInputs && (resultInputs.resume !== resume || resultInputs.jobDescription !== jobDescription || resultInputs.maxPages !== maxPages));
   const resumePageRef = useRef(null);
   const eventsPageRef = useRef(null);
   const applicationsPageRef = useRef(null);
@@ -71,6 +79,7 @@ export default function App() {
 
   // Editing invalidates feedback; an explicit click starts the next AI check.
   function setResume(text, source) {
+    revisionRequestRef.current?.abort();
     setResumeRaw(text);
     if (source || !text) {
       setSourcePages(source?.pageCount || null);
@@ -85,6 +94,7 @@ export default function App() {
   useEffect(() => () => {
     analysisRequestRef.current?.abort();
     transformRequestRef.current?.abort();
+    revisionRequestRef.current?.abort();
   }, [connection.session?.account?.id, connection.session?.connectionRevision, connection.session?.sharing, connection.busy, connection.connecting]);
 
   function showToast(msg, usage = false) {
@@ -94,7 +104,7 @@ export default function App() {
   }
 
   async function handleAnalyze() {
-    if (analysisRequestRef.current || transformRequestRef.current || cooldown.retryIn) return;
+    if (analysisRequestRef.current || transformRequestRef.current || revisionRequestRef.current || inputUploading || cooldown.retryIn) return;
     if (!aiReady) { showToast('Connect your ChatGPT plan and choose a model first.'); return; }
     if (!resume.trim()) { showToast('Please upload or paste your resume first.'); return; }
     const requestVersion = ++generationRef.current;
@@ -122,7 +132,7 @@ export default function App() {
   }
 
   async function handleTransform() {
-    if (transformRequestRef.current || analysisRequestRef.current || cooldown.retryIn) return;
+    if (transformRequestRef.current || analysisRequestRef.current || revisionRequestRef.current || saving || inputUploading || cooldown.retryIn) return;
     if (!connection.session?.sharing) {
       revealConnection();
       showToast('Choose your ChatGPT account to continue.');
@@ -133,6 +143,8 @@ export default function App() {
     if (!jobDescription.trim()) { showToast('Please fill out the job description.'); return; }
     setToast('');
     setLoading(true);
+    setRevisionError(null);
+    setRevisionProgress(null);
     setTransformError(null);
     setProgress(null);
     const controller = new AbortController();
@@ -153,6 +165,7 @@ export default function App() {
       if (!controller.signal.aborted) {
         setResult(data);
         setResultInputs({ resume, jobDescription, maxPages });
+        setFollowUpKey(value => value + 1);
       }
     } catch (err) {
       if (!controller.signal.aborted) cooldown.record(err);
@@ -174,25 +187,66 @@ export default function App() {
     }
   }
 
+  async function handleRefine(instruction) {
+    if (!result || !resultInputs || revisionRequestRef.current || transformRequestRef.current || analysisRequestRef.current || saving || inputUploading || cooldown.retryIn) return false;
+    if (staleResult) { setRevisionError({ message: 'Your inputs changed. Tailor again before refining this draft.' }); return false; }
+    if (!aiReady) { revealConnection(); setRevisionError({ message: 'Choose your ChatGPT account and an available model first.' }); return false; }
+    if (!instruction.trim() || instruction.trim().length > 2000) return false;
+    const controller = new AbortController();
+    revisionRequestRef.current = controller;
+    setRefining(true); setRevisionError(null); setRevisionProgress(null); setToast('');
+    const timeout = setTimeout(() => controller.abort(new DOMException('The revision took too long. Your previous draft and request are still here.', 'TimeoutError')), 135000);
+    try {
+      const response = await fetch('/api/revise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken },
+        body: JSON.stringify({ ...resultInputs, result, instruction: instruction.trim(), model: connection.selectedModel }),
+        signal: controller.signal,
+      });
+      const revised = await readTransformResponse(response, update => {
+        if (!controller.signal.aborted) setRevisionProgress(update);
+      });
+      if (controller.signal.aborted) return false;
+      setResult(revised); setProgress(null); setTransformError(null);
+      showToast(revised.transformedResume === result.transformedResume ? 'AI feedback is ready. Your draft is unchanged.' : revised.savedApplication ? 'Updated your draft and saved a new application version.' : 'Your revised draft is ready.');
+      return true;
+    } catch (failure) {
+      if (!controller.signal.aborted) cooldown.record(failure);
+      let message = failure.message;
+      if (controller.signal.aborted) message = controller.signal.reason?.name === 'TimeoutError' ? controller.signal.reason.message : 'Revision cancelled. Your previous draft and request are still here.';
+      else if (['session_required', 'invalid_csrf'].includes(failure.code)) {
+        await connection.refresh();
+        message = 'Your connection was refreshed. Choose your saved account and try your revision again.';
+      }
+      setRevisionError({ message, manageUsage: failure.manageUsage });
+      return false;
+    } finally {
+      clearTimeout(timeout);
+      if (revisionRequestRef.current === controller) { revisionRequestRef.current = null; setRefining(false); }
+    }
+  }
+
   async function saveApplication() {
-    if (!result || !resultInputs || saving) return;
+    if (!result || !resultInputs || saving || refining || loading) return;
+    const snapshot = result;
     setSaving(true);
     try {
       const { savedApplication: _saved, saveError: _error, ...draft } = result;
       void _saved; void _error;
       const savedApplication = await applicationRequest('save', { ...resultInputs, result: draft }, connection.session?.csrfToken);
-      setResult(previous => ({ ...previous, savedApplication, saveError: null }));
+      setResult(previous => previous === snapshot ? { ...previous, savedApplication, saveError: null } : previous);
       showToast('Application saved on this computer.');
     } catch (failure) { showToast(failure.message); }
     finally { setSaving(false); }
   }
 
   function restoreApplication(version) {
-    if (loading || analyzing) { showToast('Finish or cancel the current AI request before opening a saved version.'); return; }
+    if (loading || analyzing || refining || saving || inputUploading) { showToast('Finish or cancel the current AI request before opening a saved version.'); return; }
     setResume(version.resume, { pageCount: null });
     setJobDescription(version.jobDescription);
     setPageLimitOverride(version.maxPages);
-    setResult({ ...version.result, savedApplication: { id: applicationId } });
+    setResult({ ...version.result, savedApplication: { id: applicationId, versionId: version.id } });
+    setFollowUpKey(value => value + 1); setRevisionError(null); setRevisionProgress(null);
     setResultInputs({ resume: version.resume, jobDescription: version.jobDescription, maxPages: version.maxPages });
     setProgress(null); setTransformError(null);
     window.location.hash = '#resume';
@@ -252,7 +306,8 @@ export default function App() {
                 analyzing={analyzing}
                 onAnalyze={handleAnalyze}
                 aiReady={aiReady}
-                aiBusy={loading}
+                aiBusy={loading || refining}
+                onUploadingChange={setInputUploading}
                 sourcePages={sourcePages}
                 maxPages={maxPages}
                 setMaxPages={setPageLimitOverride}
@@ -271,7 +326,7 @@ export default function App() {
                     <button
                       className={`transform-btn${loading ? ' loading' : ''}`}
                       onClick={handleTransform}
-                      disabled={loading || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
+                      disabled={loading || refining || saving || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
                     >
                       {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : 'Tailor my resume'}<span aria-hidden="true">↗</span></>}
                     </button>
@@ -286,11 +341,20 @@ export default function App() {
                 onSave={saveApplication}
                 saving={saving}
                 loading={loading}
+                revising={refining}
                 progress={progress}
                 error={transformError}
                 retryIn={cooldown.retryIn}
-                stale={Boolean(resultInputs && (resultInputs.resume !== resume || resultInputs.jobDescription !== jobDescription || resultInputs.maxPages !== maxPages))}
-              />
+                stale={staleResult}
+              >
+                {result && <ResumeFollowUp key={followUpKey}
+                  result={result} onSubmit={handleRefine} busy={refining}
+                  disabled={staleResult || !aiReady || analyzing || inputUploading || saving}
+                  disabledReason={staleResult ? 'Your inputs changed. Tailor again to update this draft before requesting revisions.' : inputUploading ? 'Wait for your PDF to finish loading.' : analyzing ? 'Wait for the resume analysis to finish.' : saving ? 'Saving your current draft…' : !aiReady ? 'Connect your ChatGPT account and choose a model to refine this draft.' : ''}
+                  retryIn={cooldown.retryIn} error={revisionError} progress={revisionProgress}
+                  onCancel={() => revisionRequestRef.current?.abort()}
+                />}
+              </OutputPanel>
             </div>
           </div>
         </section>

@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { createChatGPTAuth } from './server/chatgpt-auth.js';
 import { createChatGPTInference } from './server/chatgpt-inference.js';
 import { transformResume } from './server/transform.js';
+import { reviseResume, validateRevisionInput } from './server/revise.js';
 import { transformProgress } from './server/transform-progress.js';
 import { withDeadline } from './server/request-deadline.js';
 import { createAIAdmission } from './server/ai-rate-limit.js';
@@ -183,6 +184,34 @@ app.post('/api/transform', async (req, res) => {
     if (applications) {
       try { result.savedApplication = await applications.save({ resume, jobDescription, maxPages, result }); }
       catch { result.saveError = 'Your draft is ready, but it could not be saved to your local application folder. Download it or retry saving.'; }
+    }
+    progress.complete(result);
+  } catch (error) {
+    admission.record(req, error);
+    progress.fail(error);
+  } finally {
+    release?.();
+  }
+});
+
+app.post('/api/revise', async (req, res) => {
+  let input;
+  try { input = validateRevisionInput(req.body); }
+  catch (error) { return sendAIError(res, error); }
+  const progress = transformProgress(req, res, log);
+  let release;
+  try {
+    release = admission.acquire(req);
+    const result = await withDeadline(req.aiSignal, Math.min(transformTimeoutMs, 120000),
+      Object.assign(new Error('This follow-up took too long. Your previous draft is unchanged. Please try a smaller edit or choose another model.'), { status: 504, code: 'revision_timeout' }),
+      async signal => {
+        req.aiSignal = signal;
+        const client = await progress.step('connection', 'Connecting to ChatGPT', () => inference.getClient(req, req.body.model));
+        return reviseResume({ client, input, step: progress.step });
+      });
+    if (applications && result.revision.changed) {
+      try { result.savedApplication = await applications.save({ resume: input.resume, jobDescription: input.jobDescription, maxPages: input.maxPages, result }); }
+      catch { result.saveError = 'Your revised draft is ready, but it could not be saved to your local application folder. Download it or retry saving.'; }
     }
     progress.complete(result);
   } catch (error) {

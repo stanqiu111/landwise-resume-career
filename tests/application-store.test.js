@@ -71,3 +71,19 @@ test('invalid paths and patches are rejected; deletion removes only the selected
   assert.equal(await readFile(join(root, 'keep.txt'), 'utf8'), 'unrelated');
   await assert.rejects(store.get(saved.id), error => error.status === 404);
 });
+
+
+test('a follow-up saves its request and reply with a new version without changing the source or prior result', async t => {
+  const { store } = await fixture(t);
+  const original = await store.save(inputs);
+  const revision = { instruction: 'Shorten the first bullet.', reply: 'Shortened the dashboard bullet.', createdAt: new Date().toISOString(), changed: true };
+  const revisedResult = { ...inputs.result, transformedResume: studentResume.replace('Built React dashboards for operations.', 'Built operations dashboards with React.'), revision, revisionHistory: [revision] };
+  const revised = await store.save({ ...inputs, result: revisedResult });
+  assert.equal(revised.id, original.id);
+  assert.equal(revised.versionCount, 2);
+  const saved = await store.get(original.id);
+  assert.equal(saved.versions[0].result.transformedResume, studentResume);
+  assert.equal(saved.versions[1].resume, studentResume);
+  assert.deepEqual(saved.versions[1].result.revision, revision);
+  assert.deepEqual(saved.versions[1].result.revisionHistory, [revision]);
+});

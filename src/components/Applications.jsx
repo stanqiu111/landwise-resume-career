@@ -43,7 +43,9 @@ function ApplicationDetail({ application, onUpdate, onRestore, onRemove, busy })
       <details><summary>Saved job description</summary><pre>{version.jobDescription}</pre></details>
       <details><summary>Original resume</summary><pre>{version.resume}</pre></details>
     </div>
-    <OutputPanel key={version.id} result={{ ...version.result, savedApplication: { id: application.id } }} />
+    <OutputPanel key={version.id} result={{ ...version.result, savedApplication: { id: application.id } }}>
+      <div className="saved-follow-up"><h3>Want to refine this version?</h3><p>Open this draft in the studio to ask AI for small changes. Your original resume and saved versions stay together.</p><button onClick={() => onRestore(version)} disabled={busy}>Refine this saved draft</button></div>
+    </OutputPanel>
     <div className="application-folder"><p>Local folder: <code>{application.folder}</code></p><p>Stored on this computer for your local user. No cloud sync. Export PDF or Word from the saved version above.</p>
       {confirmDelete ? <div role="alert"><p>Delete this application folder, all saved versions and progress?</p><button className="application-delete" disabled={busy} onClick={onRemove}>Delete folder</button><button onClick={() => setConfirmDelete(false)}>Keep it</button></div>
         : <button onClick={() => setConfirmDelete(true)}>Delete application…</button>}

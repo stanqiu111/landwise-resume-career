@@ -38,6 +38,12 @@ The original resume is the only source of candidate facts. Job requirements guid
 
 `POST /api/applications/{list,get,save,update,remove}` requires the exact local origin and session CSRF token, including reads. Reading/saving progress requires no selected provider or AI call. The server auto-saves a completed transform before returning its result. A storage failure returns the finished draft plus a save warning; the UI provides retry/export. Folder IDs are validated before path access, files use mode 0600 and created folders use 0700. This is local persistence, not multi-user cloud account isolation or synchronization.
 
+## Follow-up revisions
+
+`POST /api/revise` accepts `{ resume, jobDescription, result, instruction, maxPages, model }`. The original source and job are the inputs captured for that completed draft, not newly typed studio fields. The server validates their relationship to the current result, re-grounds its claim bank, and makes one editorial AI request. It applies small bullet edits against the current draft, checks them against the original evidence and immutable structure, validates page count, and rebuilds the fit report. There is no automatic retry or extra shortening request. Errors and overflow leave the prior draft untouched.
+
+Revision requests share the existing account lock, cooldown, origin/CSRF checks, abort signal and streamed progress. The server deadline is at most 120 seconds; the browser fallback is 135 seconds. The UI keeps the existing preview visible and disables conflicting AI/input actions. Saved versions restore the original input and current draft together. Successful changed revisions auto-save through the existing application store; no-change replies retain the previous save metadata. `revision` contains the request, reply, timestamp and changed flag; `revisionHistory` retains at most ten recent exchanges.
+
 ## Progress, cancellation and diagnosis
 
 The UI requests `Accept: application/x-ndjson`. `server/transform-progress.js` streams actual running/completed/failed stages, elapsed time and five-second heartbeats, followed by one terminal result or error. Other clients can continue receiving a regular JSON response. `src/transformResponse.js` handles fragmented updates, connection interruption and empty results.

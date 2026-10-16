@@ -3,7 +3,7 @@ import ResumeAnalysis from './ResumeAnalysis';
 
 const wordCount = text => text.trim() ? text.trim().split(/\s+/u).length : 0;
 
-export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0, children }) {
+export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0, onUploadingChange, children }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [fileName, setFileName] = useState('');
@@ -26,6 +26,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
     }
     setUploadError('');
     setUploading(true);
+    onUploadingChange?.(true);
     const controller = new AbortController();
     uploadRef.current = controller;
     const formData = new FormData();
@@ -44,6 +45,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
       if (uploadRef.current === controller) {
         uploadRef.current = null;
         setUploading(false);
+        onUploadingChange?.(false);
       }
     }
   }
