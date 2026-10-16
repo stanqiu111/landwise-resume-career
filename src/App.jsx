@@ -10,6 +10,7 @@ import useAIConnection from './useAIConnection';
 import { readTransformResponse } from './transformResponse';
 import useAICooldown from './useAICooldown';
 import { estimateResumePages } from './resumeLayout';
+import { createReadyChime } from './readyChime';
 import './App.css';
 
 function currentPage() { return window.location.hash.startsWith('#applications') ? 'applications' : window.location.hash === '#career-events' ? 'events' : 'resume'; }
@@ -24,6 +25,7 @@ function revealConnection() {
 }
 
 export default function App() {
+  const [readyChime] = useState(createReadyChime);
   const [page, setPage] = useState(currentPage);
   const [applicationId, setApplicationId] = useState(() => window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
   const [saving, setSaving] = useState(false);
@@ -58,6 +60,8 @@ export default function App() {
   const resumePageRef = useRef(null);
   const eventsPageRef = useRef(null);
   const applicationsPageRef = useRef(null);
+
+  useEffect(() => () => readyChime.dispose(), [readyChime]);
 
   useEffect(() => {
     function followLocation() {
@@ -141,6 +145,7 @@ export default function App() {
     if (!aiReady) { revealConnection(); showToast('Choose an available ChatGPT model first.'); return; }
     if (!resume.trim()) { showToast('Please upload or paste your resume first.'); return; }
     if (!jobDescription.trim()) { showToast('Please fill out the job description.'); return; }
+    readyChime.prepare();
     setToast('');
     setLoading(true);
     setRevisionError(null);
@@ -166,6 +171,7 @@ export default function App() {
         setResult(data);
         setResultInputs({ resume, jobDescription, maxPages });
         setFollowUpKey(value => value + 1);
+        readyChime.play();
       }
     } catch (err) {
       if (!controller.signal.aborted) cooldown.record(err);
@@ -192,6 +198,7 @@ export default function App() {
     if (staleResult) { setRevisionError({ message: 'Your inputs changed. Tailor again before refining this draft.' }); return false; }
     if (!aiReady) { revealConnection(); setRevisionError({ message: 'Choose your ChatGPT account and an available model first.' }); return false; }
     if (!instruction.trim() || instruction.trim().length > 2000) return false;
+    readyChime.prepare();
     const controller = new AbortController();
     revisionRequestRef.current = controller;
     setRefining(true); setRevisionError(null); setRevisionProgress(null); setToast('');
@@ -208,6 +215,7 @@ export default function App() {
       });
       if (controller.signal.aborted) return false;
       setResult(revised); setProgress(null); setTransformError(null);
+      readyChime.play();
       showToast(revised.transformedResume === result.transformedResume ? 'AI feedback is ready. Your draft is unchanged.' : revised.savedApplication ? 'Updated your draft and saved a new application version.' : 'Your revised draft is ready.');
       return true;
     } catch (failure) {
