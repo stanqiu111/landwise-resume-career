@@ -170,3 +170,28 @@
   .landwise-output .result-dialog-canvas { padding: 12px; }
   .landwise-output .result-dialog-canvas .result-document { padding: 27px 22px; font-size: 12px; }
 }
+
+.fit-report { display: grid; gap: 18px; }
+.fit-edit-note { background: #edf2fc; border-radius: 5px; padding: 12px; color: #344d83; font-size: 12px; line-height: 1.7; }
+.fit-group { display: grid; gap: 10px; }
+.fit-group h3 { font-size: 15px; line-height: 1.5; }
+.fit-group h3 > span { margin-left: 5px; color: var(--text-muted); font-weight: 400; }
+.fit-item { padding: 16px; background: #fff; border: 1px solid var(--border); border-radius: 6px; overflow-wrap: anywhere; }
+.fit-item-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.fit-item h4 { font-size: 13px; line-height: 1.6; }
+.fit-item-heading > span { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.fit-item p, .fit-item blockquote, .fit-item details { font-size: 12px; line-height: 1.7; margin-top: 9px; color: var(--text-dim); }
+.fit-item blockquote { padding: 10px 12px; border-left: 2px solid #8499d5; background: #f6f8fc; }
+.fit-item small { display: block; margin-bottom: 5px; color: var(--accent); }
+.fit-item .fit-next { color: var(--text); }
+.fit-next strong { display: block; }
+.fit-item summary { cursor: pointer; }
+.fit-empty { font-size: 12px; color: var(--text-muted); padding: 6px 0; }
+.fit-learn .fit-item { border-left: 3px solid #b6a077; }
+.result-save { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid #eceef3; font-size: 11px; line-height: 1.6; color: var(--text-dim); }
+.result-save button { padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; background: #fff; color: var(--accent); cursor: pointer; }
+
+.fit-group > summary { cursor: pointer; padding: 8px 0; color: var(--text); }
+.fit-group > summary h3 { display: inline; }
+.fit-group > .analysis-note { margin: 9px 0; }
+.fit-group > .fit-item + .fit-item { margin-top: 10px; }

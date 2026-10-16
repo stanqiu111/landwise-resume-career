@@ -39,7 +39,7 @@ const transformAnswers = [
     claims: [{ id: 'c1', text: 'Built React dashboards.', type: 'skill', raw_phrase: 'Built React dashboards.' }],
   },
   { matches: [{ requirement_id: 'r1', claim_ids: ['c1'], match_type: 'exact', confidence: 1, explanation: 'Source lists React.' }] },
-  { transformedResume: resume, matchScore: null },
+  { edits: [], requirementFeedback: [] },
 ];
 
 test('untrusted origins cannot start AI or PDF actions', async t => {
@@ -140,12 +140,15 @@ test('invalid page limits are rejected before any provider calls', async t => {
 test('overflow receives exactly one sequential shortening pass and the result fits the requested limit', async t => {
   let calls = 0;
   const extraction = { ...transformAnswers[0], claims: [{ id: 'c1', text: 'Built React dashboards for operations.', type: 'skill', raw_phrase: 'Built React dashboards for operations.' }] };
-  const answers = [extraction, transformAnswers[1], { transformedResume: overflowingResume }, { transformedResume: studentResume }];
+  const longBullet = '- Built React dashboards for operations. ' + 'Worked on useful dashboard interfaces for operations teams. '.repeat(100);
+  const longResume = studentResume.replace('- Built React dashboards for operations.', longBullet);
+  const lineId = `line-${longResume.split('\n').findIndex(line => line === longBullet)}`;
+  const answers = [extraction, transformAnswers[1], { edits: [] }, { edits: [{ lineId, replacement: 'Built React dashboards for operations.' }] }];
   const post = await harness(t, { getClient: async () => ({ messages: { create: async args => {
     if (calls >= 2) assert.match(args.messages[0].content, /LENGTH LIMIT: The finished resume must fit within 1 page/);
     return { content: [{ text: JSON.stringify(answers[calls++]) }] };
   } } }) });
-  const response = await post('/api/transform', { resume: overflowingResume, jobDescription, maxPages: 1 });
+  const response = await post('/api/transform', { resume: longResume, jobDescription, maxPages: 1 });
   assert.equal(response.status, 200, JSON.stringify(response.body));
   assert.equal(response.body.pageCount, 1);
   assert.equal(response.body.pageLimit, 1);
@@ -155,7 +158,7 @@ test('overflow receives exactly one sequential shortening pass and the result fi
 test('persistent overflow ends visibly after one shortening pass without returning an oversized resume', async t => {
   let calls = 0;
   const extraction = { ...transformAnswers[0], claims: [{ id: 'c1', text: 'Built React dashboards for operations.', type: 'skill', raw_phrase: 'Built React dashboards for operations.' }] };
-  const answers = [extraction, transformAnswers[1], { transformedResume: overflowingResume }, { transformedResume: overflowingResume }];
+  const answers = [extraction, transformAnswers[1], { edits: [] }, { edits: [] }];
   const post = await harness(t, { getClient: async () => ({ messages: { create: async () => ({ content: [{ text: JSON.stringify(answers[calls++]) }] }) } }) });
   const response = await post.stream({ resume: overflowingResume, jobDescription, maxPages: 1 });
   const events = (await response.text()).trim().split('\n').map(JSON.parse);
@@ -301,4 +304,50 @@ test('Analyze and Transform cannot run together for the same account, and the lo
   release();
   assert.equal((await analysis).status, 200);
   assert.equal((await post('/api/analyze-resume', { resume })).status, 200);
+});
+
+
+test('completed transforms auto-save their inputs and report without another AI call', async t => {
+  let calls = 0;
+  let saved;
+  const post = await harness(t, { getClient: async () => ({ messages: { create: async () => ({ content: [{ text: JSON.stringify(transformAnswers[calls++]) }] }) } }) }, {
+    applications: { save: async data => { saved = data; return { id: 'folder-id', versionId: 'version-id' }; } },
+  });
+  const response = await post('/api/transform', { resume, jobDescription, maxPages: 1 });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.savedApplication.id, 'folder-id');
+  assert.equal(saved.resume, resume);
+  assert.equal(saved.jobDescription, jobDescription);
+  assert.equal(saved.result.report.score, 100);
+  assert.equal(calls, 3);
+});
+
+test('storage failure retains the finished draft and exposes a retryable save notice', async t => {
+  let calls = 0;
+  const post = await harness(t, { getClient: async () => ({ messages: { create: async () => ({ content: [{ text: JSON.stringify(transformAnswers[calls++]) }] }) } }) }, {
+    applications: { save: async () => { throw new Error('private-storage-detail'); } },
+  });
+  const response = await post('/api/transform', { resume, jobDescription });
+  assert.equal(response.status, 200);
+  assert.equal(response.body.transformedResume, resume);
+  assert.match(response.body.saveError, /could not be saved/);
+  assert.doesNotMatch(JSON.stringify(response.body), /private-storage-detail/);
+});
+
+test('all library reads and mutations require the local authenticated CSRF session', async t => {
+  let operations = 0;
+  const reject = () => { throw Object.assign(new Error('Reload Landwise before trying again.'), { status: 403, code: 'invalid_csrf' }); };
+  const applications = Object.fromEntries(['list', 'get', 'save', 'update', 'remove'].map(key => [key, () => { operations++; }]));
+  const post = await harness(t, {}, { auth: { router: express.Router(), requireSession: reject }, applications });
+  for (const action of Object.keys(applications)) assert.equal((await post(`/api/applications/${action}`, {})).status, 403);
+  assert.equal(operations, 0);
+});
+
+test('a model full rewrite cannot bypass preservation by omitting the edit list', async t => {
+  let calls = 0;
+  const answers = [transformAnswers[0], transformAnswers[1], { transformedResume: resume.replace('Engineer | Northstar', 'Engineer | Different company') }];
+  const post = await harness(t, { getClient: async () => ({ messages: { create: async () => ({ content: [{ text: JSON.stringify(answers[calls++]) }] }) } }) });
+  const response = await post('/api/transform', { resume, jobDescription });
+  assert.equal(response.body.code, 'invalid_tailored_resume');
+  assert.equal(calls, 3);
 });

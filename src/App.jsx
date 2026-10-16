@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import InputPanel from './components/InputPanel';
+import Applications from './components/Applications';
+import { applicationRequest } from './applicationApi';
 import OutputPanel from './components/OutputPanel';
 import CareerEvents from './components/CareerEvents';
 import AIConnection from './components/AIConnection';
@@ -8,6 +10,8 @@ import { readTransformResponse } from './transformResponse';
 import useAICooldown from './useAICooldown';
 import { estimateResumePages } from './resumeLayout';
 import './App.css';
+
+function currentPage() { return window.location.hash.startsWith('#applications') ? 'applications' : window.location.hash === '#career-events' ? 'events' : 'resume'; }
 
 function revealConnection() {
   requestAnimationFrame(() => {
@@ -19,7 +23,9 @@ function revealConnection() {
 }
 
 export default function App() {
-  const [page, setPage] = useState(() => window.location.hash === '#career-events' ? 'events' : 'resume');
+  const [page, setPage] = useState(currentPage);
+  const [applicationId, setApplicationId] = useState(() => window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
+  const [saving, setSaving] = useState(false);
   const [resume, setResumeRaw] = useState('');
   const [sourcePages, setSourcePages] = useState(null);
   const [pageLimitOverride, setPageLimitOverride] = useState(null);
@@ -43,10 +49,12 @@ export default function App() {
   const transformRequestRef = useRef(null);
   const resumePageRef = useRef(null);
   const eventsPageRef = useRef(null);
+  const applicationsPageRef = useRef(null);
 
   useEffect(() => {
     function followLocation() {
-      setPage(window.location.hash === '#career-events' ? 'events' : 'resume');
+      setPage(currentPage());
+      setApplicationId(window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
       if (window.location.hash === '#ai-connection') revealConnection();
     }
     window.addEventListener('hashchange', followLocation);
@@ -54,7 +62,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const section = page === 'events' ? eventsPageRef.current : resumePageRef.current;
+    const section = page === 'events' ? eventsPageRef.current : page === 'applications' ? applicationsPageRef.current : resumePageRef.current;
     section?.focus({ preventScroll: true });
     if (window.location.hash === '#ai-connection') {
       revealConnection();
@@ -166,6 +174,31 @@ export default function App() {
     }
   }
 
+  async function saveApplication() {
+    if (!result || !resultInputs || saving) return;
+    setSaving(true);
+    try {
+      const { savedApplication: _saved, saveError: _error, ...draft } = result;
+      void _saved; void _error;
+      const savedApplication = await applicationRequest('save', { ...resultInputs, result: draft }, connection.session?.csrfToken);
+      setResult(previous => ({ ...previous, savedApplication, saveError: null }));
+      showToast('Application saved on this computer.');
+    } catch (failure) { showToast(failure.message); }
+    finally { setSaving(false); }
+  }
+
+  function restoreApplication(version) {
+    if (loading || analyzing) { showToast('Finish or cancel the current AI request before opening a saved version.'); return; }
+    setResume(version.resume, { pageCount: null });
+    setJobDescription(version.jobDescription);
+    setPageLimitOverride(version.maxPages);
+    setResult({ ...version.result, savedApplication: { id: applicationId } });
+    setResultInputs({ resume: version.resume, jobDescription: version.jobDescription, maxPages: version.maxPages });
+    setProgress(null); setTransformError(null);
+    window.location.hash = '#resume';
+    showToast('Opened the original resume and saved job. Tailoring again keeps a new version when the draft changes.');
+  }
+
   return (
     <div className="app">
       {toast && (
@@ -186,6 +219,7 @@ export default function App() {
         </a>
         <nav className="primary-nav" aria-label="Main navigation">
           <a href="#resume" aria-current={page === 'resume' ? 'page' : undefined}>Resume studio</a>
+          <a href="#applications" aria-current={page === 'applications' ? 'page' : undefined}>My applications</a>
           <a href="#career-events" aria-current={page === 'events' ? 'page' : undefined}>Career events</a>
         </nav>
         <AIConnection connection={connection} mode="compact" />
@@ -197,7 +231,7 @@ export default function App() {
             <div className="studio-intro">
               <p className="studio-eyebrow">Built around your experience</p>
               <h1>Your resume. A better fit.</h1>
-              <p className="studio-description">Bring your experience and a job description. Create a clearer, more relevant resume.</p>
+              <p className="studio-description">Small edits to your real experience. A clearer fit, a learning plan, and your next step.</p>
             </div>
             <ol className="studio-steps" aria-label="Resume tailoring steps">
               {[['01', 'Add details'], ['02', 'Tailor'], ['03', 'Review & export']].map(([number, label], index) => (
@@ -242,13 +276,15 @@ export default function App() {
                       {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : 'Tailor my resume'}<span aria-hidden="true">↗</span></>}
                     </button>
                     {loading && <button className="cancel-transform" onClick={() => transformRequestRef.current?.abort()}>Cancel tailoring</button>}
-                    <p className="transform-note">Built from your experience. Review before you apply.</p>
+                    <p className="transform-note">Keeps your roles and projects. Saves completed drafts in My applications on this computer.</p>
                   </div>
                 </>}
               </InputPanel>
 
               <OutputPanel
                 result={result}
+                onSave={saveApplication}
+                saving={saving}
                 loading={loading}
                 progress={progress}
                 error={transformError}
@@ -257,6 +293,9 @@ export default function App() {
               />
             </div>
           </div>
+        </section>
+        <section className="app-page" ref={applicationsPageRef} tabIndex={-1} hidden={page !== 'applications'} aria-label="My applications">
+          <Applications active={page === 'applications'} selectedId={applicationId} csrfToken={connection.session?.csrfToken} revision={result?.savedApplication?.versionId} onRestore={restoreApplication} onNotify={showToast} />
         </section>
         <section className="app-page" ref={eventsPageRef} tabIndex={-1} hidden={page !== 'events'} aria-label="Career events">
           <CareerEvents active={page === 'events'} onNotify={showToast} />

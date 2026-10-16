@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { applyResumeEdits, editableResumeLines, rejectUnsupportedAdditions } from './resume-edits.js';
+import { buildTailoringReport } from './tailoring-report.js';
 import { validateClaims, validateRequirements, validateMatches } from './schemas.js';
 import { chunkResume, buildRetrievalIndex } from './rag.js';
 import { groundClaims, reconcileMatches, summarizeCoverage, parseTailoredResult } from './resume-quality.js';
@@ -8,6 +10,7 @@ import { layoutResume, estimateResumePages, ResumeLengthError } from '../src/res
 const JobSchema = z.object({
   valid: z.boolean(),
   roleTitle: z.string().default(''),
+  company: z.string().default(''),
   roleLevel: z.string().default('mid'),
   requiredSkills: z.array(z.string()).default([]),
   niceToHaveSkills: z.array(z.string()).default([]),
@@ -35,7 +38,7 @@ export async function transformResume({ client, resume, jobDescription, maxPages
 - Only the ORIGINAL RESUME can support claims about the candidate. Each raw_phrase must be an exact quotation from that resume.
 
 Return this JSON shape:
-{"job":{"valid":true,"roleTitle":"string","roleLevel":"entry|mid|senior|lead|executive","requiredSkills":[],"niceToHaveSkills":[],"mustHaveKeywords":[],"requirements":[{"id":"req1","text":"Exact requirement phrase","type":"skill|responsibility|qualification|domain","priority":"must_have|nice_to_have","keywords":[]}]},"claims":[{"id":"c1","text":"Exact fact","type":"metric|skill|responsibility|domain|tool|leadership|impact","raw_phrase":"Exact quotation from the original resume"}]}
+{"job":{"valid":true,"roleTitle":"string","company":"Employer name explicitly in the JD, or empty if unknown","roleLevel":"entry|mid|senior|lead|executive","requiredSkills":[],"niceToHaveSkills":[],"mustHaveKeywords":[],"requirements":[{"id":"req1","text":"Exact requirement phrase","type":"skill|responsibility|qualification|domain","priority":"must_have|nice_to_have","keywords":[]}]},"claims":[{"id":"c1","text":"Exact fact","type":"metric|skill|responsibility|domain|tool|leadership|impact","raw_phrase":"Exact quotation from the original resume"}]}
 
 Accept professional job content with roles, responsibilities, skills or qualifications. For nonsense or unrelated content return {"job":{"valid":false},"claims":[]}.
 Extract distinct explicit requirements and short keyword lists. Extract concrete resume facts, including metrics, tools, roles, education and achievements. Do not infer or extrapolate. Never copy a job requirement into a candidate claim unless the original resume independently states it.
@@ -66,7 +69,7 @@ Extract distinct explicit requirements and short keyword lists. Extract concrete
     'You match verified resume facts to job requirements. Return valid JSON only, with no markdown fences.',
     `Link each requirement to the best supporting claims. Do not infer skills or experience from the job description.
 Return {"matches":[{"requirement_id":"req1","claim_ids":["c1"],"match_type":"exact|semantic|unsupported","confidence":0.9,"explanation":"Short explanation"}]}.
-Use only supplied IDs. Unsupported requirements must have empty claim_ids.
+Use only supplied IDs. Unsupported requirements must have empty claim_ids. Exact means the evidence satisfies the requirement directly; semantic means related or transferable evidence with a meaningful remaining gap. Do not treat a related tool, industry or level as full qualification. Explain the remaining gap.
 <verified_claims>\n${JSON.stringify(resumeClaims)}\n</verified_claims>
 <requirements>\n${JSON.stringify(jdRequirements)}\n</requirements>`));
   const claimMatches = reconcileMatches(validateMatches(matching.matches), jdRequirements, resumeClaims);
@@ -80,10 +83,22 @@ Use only supplied IDs. Unsupported requirements must have empty claim_ids.
   }));
   function validate() {
     let parsed;
-    try { parsed = parseTailoredResult(message.content[0].text, resume); }
+    let response;
+    try {
+      response = JSON.parse(message.content[0].text);
+      if (!Array.isArray(response.edits)) throw new Error('Missing targeted edits.');
+      const transformedResume = applyResumeEdits(resume, response.edits);
+      rejectUnsupportedAdditions(resume, transformedResume, jdRequirements, claimMatches);
+      parsed = parseTailoredResult(JSON.stringify({ transformedResume, improvements: response.improvements || [] }), resume);
+    }
     catch { throw inputError('The tailored draft did not pass the completeness and accuracy checks. Please try transforming again.', 502, 'invalid_tailored_resume'); }
     const layout = layoutResume(parsed.transformedResume, maxPages);
-    return { ...parsed, ...claimAnalysis, pageLimit: maxPages, pageCount: layout.pageCount };
+    const report = buildTailoringReport(jdRequirements, claimMatches, resumeClaims, parsed.transformedResume,
+      Array.isArray(response.requirementFeedback) ? response.requirementFeedback : []);
+    return { ...parsed, ...claimAnalysis, matchScore: report.score, report,
+      job: { company: jobDescription.toLowerCase().includes(analysis.company.toLowerCase()) ? analysis.company : '', roleTitle: analysis.roleTitle },
+      changes: response.edits.map(edit => ({ original: editableResumeLines(resume).find(line => line.id === edit.lineId).text, revised: edit.replacement })),
+      editCount: response.edits.length, pageLimit: maxPages, pageCount: layout.pageCount };
   }
   // Only a real overflow adds one bounded, sequential editing request. Never
   // truncate the draft, shrink below the readable styles, or silently add pages.
@@ -92,7 +107,7 @@ Use only supplied IDs. Unsupported requirements must have empty claim_ids.
     if (!(error instanceof ResumeLengthError)) throw error;
     message = await step('shortening', 'Fitting the draft to your original length', () => client.messages.create({
       system: TAILORING_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: `${writerPrompt}\n\nThe previous draft needed ${error.actualPages} pages. Rewrite it to fit the ${maxPages}-page limit. Be substantially more concise while preserving the source history and facts. Return the same JSON shape.\n<draft_to_shorten>\n${message.content[0].text}\n</draft_to_shorten>` }],
+      messages: [{ role: 'user', content: `${writerPrompt}\n\nThe previous draft needed ${error.actualPages} pages. Return a fresh set of edits against the ORIGINAL bullet IDs to fit the ${maxPages}-page limit. Keep the same edit cap and preserve every experience and its purpose. Never remove source lines. Return the same JSON shape.\n<draft_to_shorten>\n${message.content[0].text}\n</draft_to_shorten>` }],
     }));
     return step('checking', 'Checking the finished resume and page count', async () => {
       try { return validate(); }

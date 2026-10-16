@@ -10,7 +10,7 @@ The API binds to `127.0.0.1`. AI requests require a local session, exact app ori
 
 Users paste text or upload a PDF to `POST /api/parse-pdf`. PDF parsing happens locally and returns text plus the original page count, without synthetic page-number markers. A PDF's page count becomes the default output limit. Pasted text is estimated using the standard export layout; the user can adjust the page limit. They add a job description, select an account model and click Transform.
 
-The result has three tabs: Resume, Analysis and Claims. The resume is copyable, expandable and downloadable as PDF or DOCX. Exports are generated in the browser. Analysis shows supported keywords, skill gaps and changes; Claims shows evidence coverage.
+The result has three tabs: Resume, Fit report and Evidence. The resume is copyable, expandable and downloadable as PDF or DOCX. Exports are generated in the browser. Fit report separates direct evidence present in the draft, transferable evidence to expand, and requirements to learn or substantiate; Evidence shows requirement coverage. Exact final-draft quotes are verified before being displayed as placement evidence.
 
 ## Transform pipeline
 
@@ -20,7 +20,7 @@ The result has three tabs: Resume, Analysis and Claims. The resume is copyable, 
 
 1. **Combined extraction:** one call validates and analyzes the job description, extracts requirements and extracts resume facts with exact source quotations. Local grounding accepts only quotations present in the original resume; the job description never serves as candidate evidence.
 2. **Matching:** matches job requirements to the verified claim bank. Local checks discard invented claim IDs and unsupported source quotations, and derive coverage from remaining valid matches.
-3. **Writing:** generates the complete tailored resume using the full original resume, verified claims, job analysis and locally retrieved relevant sections.
+3. **Targeted editing and coaching:** returns replacements for a limited set of existing bullet IDs and a next step for each requirement, using the full original resume, verified claims, job analysis and locally retrieved relevant sections. `server/resume-edits.js` applies only valid replacements to the original lines; all other lines remain unchanged. At most 35% of bullets rounded up may be edited (minimum one). Empty, multiline, duplicate, non-bullet or substantially expanded replacements are rejected. Metrics must remain in their own original bullet. The model cannot substitute a full rewrite.
 
 Local final checks reject missing contact details, omitted education and invented numbers. Invalid output produces a visible error rather than an empty success response. Retrieval uses local TF-IDF and makes no external calls.
 
@@ -29,6 +29,14 @@ The writer receives the page limit and a source-based word budget. `src/resumeLa
 PDF export uses the exact same layout calculation as server validation and refuses overflow. DOCX uses the same wrapped lines, page size, margins, fixed line spacing and explicit page breaks. Its pagination is verified in LibreOffice for representative fixtures; changing fonts, editing content or opening it in another word processor can reflow it. The PDF is the fixed-pagination format.
 
 The original resume is the only source of candidate facts. Job requirements guide emphasis and never establish candidate experience. Prompts preserve identifying history and prohibit invented skills, achievements and metrics.
+
+## Fit report and application library
+
+`server/tailoring-report.js` calculates a source-evidence score independently of the writer: must-have requirements have weight 2, preferred weight 1; exact evidence earns 1, semantic/transferable evidence 0.5, absent evidence 0. Evidence IDs must exist in the grounded claim bank. Placement quotes must occur in the final draft and have supporting source evidence. Unverified placement remains in the expand group. Coaching is generated in the existing writing request, with local fallback next steps when absent. Scores are not hiring predictions or validated ATS results.
+
+`server/application-store.js` stores completed results under `~/Documents/Landwise/Applications`, one local OS-user library, separate from provider credentials. Application snapshots are committed with atomic rename and serialized mutations. Version subfolders contain readable source, JD, draft and report files. SHA-256 of the trimmed exact JD groups versions; an identical retry is idempotent. Metadata includes editable company/role, stage, notes, practice tasks and dated progress changes. Original version inputs and reports never change when progress is updated.
+
+`POST /api/applications/{list,get,save,update,remove}` requires the exact local origin and session CSRF token, including reads. Reading/saving progress requires no selected provider or AI call. The server auto-saves a completed transform before returning its result. A storage failure returns the finished draft plus a save warning; the UI provides retry/export. Folder IDs are validated before path access, files use mode 0600 and created folders use 0700. This is local persistence, not multi-user cloud account isolation or synchronization.
 
 ## Progress, cancellation and diagnosis
 
@@ -52,6 +60,8 @@ Server logs contain only `transform_step`, `transform_complete` or `transform_fa
 - `server.js`: API routes, input validation and request lifecycle.
 - `server/chatgpt-auth.js`: account connection and protected credentials.
 - `server/chatgpt-inference.js`: model discovery and complete response streams.
+- `server/resume-edits.js`, `server/tailoring-report.js`: limited edits and evidence-derived fit feedback.
+- `server/application-store.js`, `src/components/Applications.jsx`: local folders, versions and application progress.
 - `server/transform.js`: sequential extraction, matching and tailoring.
 - `server/transform-progress.js`: stage timing and progress response.
 - `server/request-deadline.js`: cancellation and full-operation deadlines.

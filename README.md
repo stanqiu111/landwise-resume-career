@@ -8,17 +8,18 @@ Landwise is a local resume tailoring app with career-event discovery. Connect an
 
 ## Features
 
-- **AI resume tailoring** — rewrites your resume around experience supported by your source text
+- **Light resume tailoring** — edits a small portion of existing bullets while preserving every role, project, heading, date and original purpose
 - **Claim-based evidence checks** — extracts quoted claims from your resume and matches them to job requirements before rewriting
 - **Local retrieval** — uses TF-IDF to retrieve relevant resume sections without a separate embedding service or API key
 - **Continue with ChatGPT** — OAuth sign-in, account switching, model selection, and usage management using the user’s eligible plan
 - **Resume analysis** — on-demand feedback on resume quality, section scores, and suggested LLM/AI skills to add
-- **Match score** — estimated keyword overlap after tailoring
+- **Match score & fit report** — weighted source evidence, separating direct matches, transferable experience to expand, and requirements to learn or substantiate
+- **My applications** — local folders containing the original resume, JD, tailored versions and reports; track applications, interviews, notes and learning/coding practice
 - **Skills gap** — surfaces JD requirements your resume can't support, instead of inventing them
 - **Length-aware PDF & DOCX export** — default to the original PDF page count, check the rendered layout and keep exported content within the selected limit
 - **PDF upload** — drag-and-drop your existing resume as a PDF
 - **Readable output** — clear section hierarchy and bullets in the preview, PDF, and DOCX
-- **Focused workspace** — a white, gray, black, and blue two-column layout, collapsible account settings, and separate Resume, Changes, and Evidence views
+- **Focused workspace** — a white, gray, black, and blue two-column layout, collapsible account settings, and separate Resume, Fit report, and Evidence views
 - **Career events** — student-oriented career fairs and organizer calendars across Canada and the United States, with original sources, dates, and eligibility
 - **Event discovery** — search and filter by country, location, school, and access; save resources in your browser or copy an organizer’s link
 - **Nearby events** — request browser location when Career events first opens, sort by approximate distance, or switch to soonest first
@@ -46,7 +47,13 @@ Landwise is a local resume tailoring app with career-event discovery. Connect an
 1. Open **http://127.0.0.1:5174** and click **Continue with ChatGPT**.
 2. Complete ChatGPT’s own sign-in and approve plan usage for Landwise. Eligible plans and usage limits are controlled by OpenAI.
 3. Return to Landwise, choose a model from your account’s catalog, and upload or paste your resume. PDF uploads set the output page limit automatically; for pasted text, review the estimated limit and adjust it if needed.
-4. Click **Analyze my resume** for feedback, or add a job description and click **Tailor my resume**. Review the **Resume**, **Changes**, and **Evidence** tabs, then use **Full screen**, **Copy text**, **PDF**, or **DOCX**. Account and model settings are available beneath the inputs or from the header's connection link.
+4. Click **Analyze my resume** for feedback, or add a job description and click **Tailor my resume**. Review the **Resume**, **Fit report**, and **Evidence** tabs, then use **Full screen**, **Copy text**, **PDF**, or **DOCX**. Account and model settings are available beneath the inputs or from the header's connection link.
+
+Completed transforms are automatically saved in **My applications**, grouped by the exact job description. Company and role are extracted from the job posting; you can correct their labels. New drafts for the same posting keep earlier versions. Open a saved version to review its original input, JD, draft and report, export it, or restore the original inputs to the studio. Track Resume ready → Applied → Interview → Offer/Closed and save notes and learning/coding-practice tasks. A checklist is seeded from the first report's gaps; you control later updates.
+
+Files live in `~/Documents/Landwise/Applications`, outside the repository, with private folder/file permissions. Each folder holds `application.json` plus version folders with the original resume, JD, tailored text and report. This is the local operating-system user's library, accessible in the local app independently of which ChatGPT account is selected. It is **not** cloud storage, a separate Landwise account, or cross-device sync. Deleting a folder in the app deletes its local versions and progress. If saving fails, the finished draft remains available for export and **Save application** retries saving without another AI call.
+
+The editor can replace only selected existing bullet lines (at most 35% rounded up, with a minimum allowance of one). It cannot replace the full resume, remove an experience or add a new role. Facts must stay with their original role/project. Before/after bullets are available in the fit report. Text without recognized bullet markers stays unchanged. The score uses extracted requirements: must-haves weigh twice as much, direct evidence earns full credit, related evidence half, and absent evidence zero. It is a source-evidence estimate, not an ATS score or a hiring prediction. Missing evidence is not proof that you lack a skill.
 
 Typing and signing in do not start AI generation. An explicit analysis or transform sends the required resume/job text to OpenAI and uses your plan allowance. A transform normally makes three sequential requests to read the sources, match requirements and write the draft. If the draft exceeds the page limit, it makes at most one additional request to tighten the wording. Provider failures are not retried automatically. **Manage usage** opens ChatGPT’s controls. Career events and local PDF parsing work without sign-in.
 
@@ -120,7 +127,7 @@ Upload resume or paste text → Set page limit → Add job description
 
 PDF exports use the same page measurement as validation, with readable 10.5–11 pt body text. Oversized drafts are rejected instead of cut off or exported with extra pages. Word exports use matching wrapping and explicit page breaks, but fonts and later edits can change Word pagination; use PDF when the exact page count matters.
 
-The app uses prompt and validation improvements rather than model fine-tuning. The writer receives the complete original resume, while retrieval identifies evidence to emphasize. Claimed evidence must quote source text, and the finished draft is checked for contact details, education, and new numeric claims. Review the result before submitting it; these checks cannot prove every sentence is accurate.
+The app uses prompt and validation improvements rather than model fine-tuning. The writer receives the complete original resume, while retrieval identifies evidence to emphasize. Claimed evidence must quote source text, and limited bullet replacements are checked before being applied to the original text. Bullet edits cannot change source metrics. The finished draft is checked for contact details, education, new numeric claims and page count. Review the result before submitting it; these checks cannot prove every sentence is accurate.
 
 Run `npm test`, `npm run lint`, and `npm run build` when changing the pipeline. See [QUALITY.md](./QUALITY.md) for writing rules, evaluation cases, and the GitHub projects that informed the approach.
 

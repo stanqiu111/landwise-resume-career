@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { resumePDF, estimateResumePages } from '../resumeLayout';
 import { resumeDOCXBlob } from '../resumeDocx';
 import ClaimCoverage from './ClaimCoverage';
+import FitReport from './FitReport';
 import UnsupportedRequirements from './UnsupportedRequirements';
 import TransformActivity from './TransformActivity';
 import { parseResumeLines } from '../resumeDocument';
@@ -9,7 +10,7 @@ import './OutputPanel.css';
 
 const TABS = [
   { id: 'resume', label: 'Resume' },
-  { id: 'changes', label: 'Changes' },
+  { id: 'report', label: 'Fit report' },
   { id: 'evidence', label: 'Evidence' },
 ];
 
@@ -24,21 +25,13 @@ function ResumePreview({ text }) {
   </article>;
 }
 
-function MatchScore({ score }) {
-  const label = score >= 75 ? 'Strong match' : score >= 50 ? 'Moderate match' : 'Limited match';
-  return <div className="result-match">
-    <span className="result-match-number">{score}<small>/100</small></span>
-    <div><strong>{label}</strong><span>Estimated keyword overlap</span></div>
-  </div>;
-}
-
-function documentFilename(text) {
-  const name = parseResumeLines(text).find(line => line.type === 'name')?.text || 'tailored';
+function documentFilename(text, job) {
+  const name = [job?.company, job?.roleTitle].filter(Boolean).join(' ') || parseResumeLines(text).find(line => line.type === 'name')?.text || 'tailored';
   const slug = name.toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 70);
   return `${slug || 'tailored'}-resume`;
 }
 
-export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false }) {
+export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false }) {
   const [copyState, setCopyState] = useState('');
   const [tab, setTab] = useState('resume');
   const [expanded, setExpanded] = useState(false);
@@ -49,7 +42,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
   const id = useId();
   const resumeText = result?.transformedResume || '';
   const hasResult = Boolean(resumeText);
-  const filename = documentFilename(resumeText);
+  const filename = documentFilename(resumeText, result?.job);
 
   useEffect(() => () => clearTimeout(copyTimer.current), []);
 
@@ -172,6 +165,10 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
         {result.pageCount && progress?.complete ? ' · ' : ''}
         {progress?.complete ? `Ready in ${Math.round(progress.elapsedMs / 1000)} seconds` : ''}
       </p>}
+      <div className="result-save">
+        {result.savedApplication ? <><span>Saved in your local application folder.</span><a href={`#applications/${result.savedApplication.id}`}>View application ↗</a></>
+          : <><span>{result.saveError || 'Keep this draft, its job description and fit report together.'}</span>{onSave && <button onClick={onSave} disabled={loading || saving}>{saving ? 'Saving…' : 'Save application'}</button>}</>}
+      </div>
       <span className="result-sr-only" role="status">{copyState === 'copied' ? 'Resume copied to clipboard.' : ''}</span>
       {copyState === 'failed' && <p className="result-inline-error" role="alert">Copy wasn’t available. Open Full screen to select the text, or download your resume.</p>}
       {exportError && <p className="result-inline-error" role="alert">{exportError}</p>}
@@ -191,23 +188,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
 
       {!loading && hasResult && <div id={`${id}-panel-${tab}`} role="tabpanel" aria-labelledby={`${id}-tab-${tab}`} tabIndex={0} className="result-tabpanel">
         {tab === 'resume' && <ResumePreview text={resumeText} />}
-        {tab === 'changes' && <div className="analysis-content result-details">
-          {result.matchScore != null && <MatchScore score={result.matchScore} />}
-          {result.keywordsAdded?.length > 0 && <div className="analysis-section">
-            <h3 className="analysis-title">Keywords added</h3>
-            <div className="chip-group">{result.keywordsAdded.map((keyword, index) => <span key={index} className="chip chip-success">{keyword}</span>)}</div>
-          </div>}
-          {result.missingSkills?.length > 0 && <div className="analysis-section">
-            <h3 className="analysis-title">Skills gap</h3>
-            <div className="chip-group">{result.missingSkills.map((keyword, index) => <span key={index} className="chip chip-warn">{keyword}</span>)}</div>
-            <p className="analysis-note">Required by the job but not in your resume. Consider these for a cover letter or learning plan.</p>
-          </div>}
-          {result.improvements?.length > 0 && <div className="analysis-section">
-            <h3 className="analysis-title">Changes made</h3>
-            <ul className="improvements-list">{result.improvements.map((improvement, index) => <li key={index}>{improvement}</li>)}</ul>
-          </div>}
-          {result.matchScore == null && !result.keywordsAdded?.length && !result.missingSkills?.length && !result.improvements?.length && <p className="result-details-empty">No change summary was provided for this draft.</p>}
-        </div>}
+        {tab === 'report' && <FitReport result={result} />}
         {tab === 'evidence' && <div className="claims-content result-details">
           {result.claim_coverage != null && <ClaimCoverage coverage={result.claim_coverage} />}
           {Array.isArray(result.unsupported_requirements) ? <UnsupportedRequirements items={result.unsupported_requirements} /> : <p className="result-details-empty">No requirement evidence was provided for this draft. Review every claim against your original resume.</p>}

@@ -1,4 +1,5 @@
 import express from 'express';
+import { createApplicationStore } from './server/application-store.js';
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
 import dotenv from 'dotenv';
@@ -24,7 +25,7 @@ function sendAIError(res, error) {
   });
 }
 
-export function createLandwiseApp({ auth, inference, appOrigin = 'http://127.0.0.1:5174', transformTimeoutMs = 240000, log = console.info }) {
+export function createLandwiseApp({ auth, inference, appOrigin = 'http://127.0.0.1:5174', transformTimeoutMs = 240000, log = console.info, applications = null }) {
 const app = express();
 const admission = createAIAdmission(auth);
 app.disable('x-powered-by');
@@ -43,6 +44,22 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use(auth.router);
+
+// POST reads carry the same origin/session/CSRF protection as local AI actions.
+if (applications) {
+  for (const [action, operation] of Object.entries({
+    list: () => applications.list(),
+    get: body => applications.get(body.id),
+    save: body => applications.save(body),
+    update: body => applications.update(body.id, body.patch),
+    remove: body => applications.remove(body.id),
+  })) app.post(`/api/applications/${action}`, async (req, res) => {
+    try { auth.requireSession(req); res.json(await operation(req.body)); }
+    catch (error) {
+      res.status(error.status || 500).json({ error: error.status ? error.message : 'Your application folder could not be accessed. Your current draft is still available.', code: error.code || 'application_storage_failed' });
+    }
+  });
+}
 
 app.post('/api/ai/models', async (req, res) => {
   try {
@@ -163,6 +180,10 @@ app.post('/api/transform', async (req, res) => {
         const client = await progress.step('connection', 'Connecting to ChatGPT', () => inference.getClient(req, req.body.model));
         return transformResume({ client, resume, jobDescription, maxPages, step: progress.step });
       });
+    if (applications) {
+      try { result.savedApplication = await applications.save({ resume, jobDescription, maxPages, result }); }
+      catch { result.saveError = 'Your draft is ready, but it could not be saved to your local application folder. Download it or retry saving.'; }
+    }
     progress.complete(result);
   } catch (error) {
     admission.record(req, error);
@@ -185,7 +206,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const appOrigin = process.env.LANDWISE_APP_ORIGIN || 'http://127.0.0.1:5174';
   const auth = await createChatGPTAuth({ appOrigin, port });
   const inference = createChatGPTInference({ getAccessToken: auth.getAccessToken });
-  const app = createLandwiseApp({ auth, inference, appOrigin });
+  const app = createLandwiseApp({ auth, inference, appOrigin, applications: createApplicationStore() });
   const server = app.listen(port, '127.0.0.1', () => console.log(`Landwise API running on http://127.0.0.1:${port}`));
   async function shutdown() {
     server.close();
