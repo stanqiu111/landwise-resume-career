@@ -6,6 +6,8 @@ import OutputPanel from './components/OutputPanel';
 import ResumeFollowUp from './components/ResumeFollowUp';
 import CareerEvents from './components/CareerEvents';
 import AIConnection from './components/AIConnection';
+import LandwiseAccount from './components/LandwiseAccount';
+import useLandwiseAccount from './useLandwiseAccount';
 import useAIConnection from './useAIConnection';
 import { readTransformResponse } from './transformResponse';
 import useAICooldown from './useAICooldown';
@@ -25,6 +27,18 @@ function revealConnection() {
 }
 
 export default function App() {
+  const account = useLandwiseAccount();
+  if (account.loading || account.configError) return <main className="landwise-startup">
+    <h1>Landwise</h1>
+    {account.loading ? <p role="status">Opening your workspace…</p> : <><p role="alert">{account.configError}</p><button onClick={account.retry}>Try again</button></>}
+  </main>;
+  // A different Landwise user gets a fresh subtree. Token refreshes keep the
+  // same key, while sign-out/account switches unmount every private draft,
+  // library view and upload/request controller before another user sees them.
+  return <Workspace key={account.workspaceKey} account={account} />;
+}
+
+function Workspace({ account }) {
   const [readyChime] = useState(createReadyChime);
   const [page, setPage] = useState(currentPage);
   const [applicationId, setApplicationId] = useState(() => window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
@@ -51,11 +65,12 @@ export default function App() {
   const [analyzing, setAnalyzing] = useState(false);
   const connection = useAIConnection();
   const cooldown = useAICooldown(connection.session?.account?.id);
-  const aiReady = Boolean(connection.session?.connected && connection.session?.sharing && connection.selectedModel && !connection.busy && !connection.connecting);
+  const aiReady = Boolean(account.ready && connection.session?.connected && connection.session?.sharing && connection.selectedModel && !connection.busy && !connection.connecting);
   const generationRef = useRef(0);
   const analysisRequestRef = useRef(null);
   const transformRequestRef = useRef(null);
   const revisionRequestRef = useRef(null);
+  const saveRequestRef = useRef(null);
   const staleResult = Boolean(resultInputs && (resultInputs.resume !== resume || resultInputs.jobDescription !== jobDescription || resultInputs.maxPages !== maxPages));
   const resumePageRef = useRef(null);
   const eventsPageRef = useRef(null);
@@ -99,6 +114,7 @@ export default function App() {
     analysisRequestRef.current?.abort();
     transformRequestRef.current?.abort();
     revisionRequestRef.current?.abort();
+    saveRequestRef.current?.abort();
   }, [connection.session?.account?.id, connection.session?.connectionRevision, connection.session?.sharing, connection.busy, connection.connecting]);
 
   function showToast(msg, usage = false) {
@@ -109,6 +125,7 @@ export default function App() {
 
   async function handleAnalyze() {
     if (analysisRequestRef.current || transformRequestRef.current || revisionRequestRef.current || inputUploading || cooldown.retryIn) return;
+    if (!account.ready) { showToast('Sign in to your Landwise account first.'); return; }
     if (!aiReady) { showToast('Connect your ChatGPT plan and choose a model first.'); return; }
     if (!resume.trim()) { showToast('Please upload or paste your resume first.'); return; }
     const requestVersion = ++generationRef.current;
@@ -119,7 +136,7 @@ export default function App() {
     try {
       const response = await fetch('/api/analyze-resume', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': connection.session.csrfToken },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': connection.session.csrfToken, ...await account.authorizeHeaders() },
         body: JSON.stringify({ resume, model: connection.selectedModel }),
         signal: controller.signal,
       });
@@ -137,6 +154,7 @@ export default function App() {
 
   async function handleTransform() {
     if (transformRequestRef.current || analysisRequestRef.current || revisionRequestRef.current || saving || inputUploading || cooldown.retryIn) return;
+    if (!account.ready) { showToast('Sign in to your Landwise account before tailoring a resume.'); return; }
     if (!connection.session?.sharing) {
       revealConnection();
       showToast('Choose your ChatGPT account to continue.');
@@ -160,7 +178,7 @@ export default function App() {
     try {
       const res = await fetch('/api/transform', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken, ...await account.authorizeHeaders() },
         body: JSON.stringify({ resume, jobDescription, model: connection.selectedModel, maxPages }),
         signal: controller.signal,
       });
@@ -195,6 +213,7 @@ export default function App() {
 
   async function handleRefine(instruction) {
     if (!result || !resultInputs || revisionRequestRef.current || transformRequestRef.current || analysisRequestRef.current || saving || inputUploading || cooldown.retryIn) return false;
+    if (!account.ready) { setRevisionError({ message: 'Sign in to your Landwise account before refining your draft.' }); return false; }
     if (staleResult) { setRevisionError({ message: 'Your inputs changed. Tailor again before refining this draft.' }); return false; }
     if (!aiReady) { revealConnection(); setRevisionError({ message: 'Choose your ChatGPT account and an available model first.' }); return false; }
     if (!instruction.trim() || instruction.trim().length > 2000) return false;
@@ -206,7 +225,7 @@ export default function App() {
     try {
       const response = await fetch('/api/revise', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken, ...await account.authorizeHeaders() },
         body: JSON.stringify({ ...resultInputs, result, instruction: instruction.trim(), model: connection.selectedModel }),
         signal: controller.signal,
       });
@@ -235,17 +254,20 @@ export default function App() {
   }
 
   async function saveApplication() {
-    if (!result || !resultInputs || saving || refining || loading) return;
+    if (!result || !resultInputs || saving || refining || loading || !account.ready) return;
     const snapshot = result;
+    const controller = new AbortController();
+    saveRequestRef.current = controller;
     setSaving(true);
     try {
       const { savedApplication: _saved, saveError: _error, ...draft } = result;
       void _saved; void _error;
-      const savedApplication = await applicationRequest('save', { ...resultInputs, result: draft }, connection.session?.csrfToken);
+      const savedApplication = await applicationRequest('save', { ...resultInputs, result: draft }, connection.session?.csrfToken, { authorizeHeaders: account.authorizeHeaders, signal: controller.signal });
+      if (controller.signal.aborted) return;
       setResult(previous => previous === snapshot ? { ...previous, savedApplication, saveError: null } : previous);
-      showToast('Application saved on this computer.');
-    } catch (failure) { showToast(failure.message); }
-    finally { setSaving(false); }
+      showToast(account.cloud ? 'Application saved to your Landwise account.' : 'Application saved on this computer.');
+    } catch (failure) { if (!controller.signal.aborted) showToast(failure.message); }
+    finally { if (saveRequestRef.current === controller) { saveRequestRef.current = null; setSaving(false); } }
   }
 
   function restoreApplication(version) {
@@ -288,6 +310,7 @@ export default function App() {
       </header>
 
       <main className="app-main">
+        <LandwiseAccount account={account} />
         <section className="app-page" ref={resumePageRef} tabIndex={-1} hidden={page !== 'resume'} aria-label="Resume studio">
           <div className="studio-hero">
             <div className="studio-intro">
@@ -306,6 +329,10 @@ export default function App() {
           <div className="studio-workspace">
             <div className="panels">
               <InputPanel
+                authorizeHeaders={account.authorizeHeaders}
+                csrfToken={connection.session?.csrfToken}
+                uploadAllowed={account.ready && (!account.cloud || Boolean(connection.session?.csrfToken))}
+                accountRequired={account.cloud && !account.user}
                 resume={resume}
                 setResume={setResume}
                 jobDescription={jobDescription}
@@ -334,17 +361,18 @@ export default function App() {
                     <button
                       className={`transform-btn${loading ? ' loading' : ''}`}
                       onClick={handleTransform}
-                      disabled={loading || refining || saving || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
+                      disabled={!account.ready || loading || refining || saving || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
                     >
                       {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : 'Tailor my resume'}<span aria-hidden="true">↗</span></>}
                     </button>
                     {loading && <button className="cancel-transform" onClick={() => transformRequestRef.current?.abort()}>Cancel tailoring</button>}
-                    <p className="transform-note">Keeps your roles and projects. Saves completed drafts in My applications on this computer.</p>
+                    <p className="transform-note">{account.cloud && !account.user ? 'Sign in to Landwise above, then connect your ChatGPT plan to tailor a resume.' : `Keeps your roles and projects. Saves completed drafts in My applications ${account.cloud ? 'in your Landwise account' : 'on this computer'}.`}</p>
                   </div>
                 </>}
               </InputPanel>
 
               <OutputPanel
+                storage={account.cloud ? 'supabase' : 'local'}
                 result={result}
                 onSave={saveApplication}
                 saving={saving}
@@ -358,7 +386,7 @@ export default function App() {
                 {result && <ResumeFollowUp key={followUpKey}
                   result={result} onSubmit={handleRefine} busy={refining}
                   disabled={staleResult || !aiReady || analyzing || inputUploading || saving}
-                  disabledReason={staleResult ? 'Your inputs changed. Tailor again to update this draft before requesting revisions.' : inputUploading ? 'Wait for your PDF to finish loading.' : analyzing ? 'Wait for the resume analysis to finish.' : saving ? 'Saving your current draft…' : !aiReady ? 'Connect your ChatGPT account and choose a model to refine this draft.' : ''}
+                  disabledReason={!account.ready ? 'Sign in to your Landwise account to refine a draft.' : staleResult ? 'Your inputs changed. Tailor again to update this draft before requesting revisions.' : inputUploading ? 'Wait for your PDF to finish loading.' : analyzing ? 'Wait for the resume analysis to finish.' : saving ? 'Saving your current draft…' : !aiReady ? 'Connect your ChatGPT account and choose a model to refine this draft.' : ''}
                   retryIn={cooldown.retryIn} error={revisionError} progress={revisionProgress}
                   onCancel={() => revisionRequestRef.current?.abort()}
                 />}
@@ -367,7 +395,8 @@ export default function App() {
           </div>
         </section>
         <section className="app-page" ref={applicationsPageRef} tabIndex={-1} hidden={page !== 'applications'} aria-label="My applications">
-          <Applications active={page === 'applications'} selectedId={applicationId} csrfToken={connection.session?.csrfToken} revision={result?.savedApplication?.versionId} onRestore={restoreApplication} onNotify={showToast} />
+          {account.ready ? <Applications key={account.workspaceKey} storage={account.cloud ? 'supabase' : 'local'} authorizeHeaders={account.authorizeHeaders} active={page === 'applications'} selectedId={applicationId} csrfToken={connection.session?.csrfToken} revision={result?.savedApplication?.versionId} onRestore={restoreApplication} onNotify={showToast} />
+            : <div className="application-card application-empty"><h1>My applications</h1><p>Sign in to Landwise above to open your own application library.</p></div>}
         </section>
         <section className="app-page" ref={eventsPageRef} tabIndex={-1} hidden={page !== 'events'} aria-label="Career events">
           <CareerEvents active={page === 'events'} onNotify={showToast} />

@@ -15,7 +15,7 @@ Landwise is a local resume tailoring app with career-event discovery. Connect an
 - **Resume analysis** — on-demand feedback on resume quality, section scores, and suggested LLM/AI skills to add
 - **Match score & fit report** — weighted source evidence, separating direct matches, transferable experience to expand, and requirements to learn or substantiate
 - **Follow-up revisions** — after tailoring, ask for small wording changes in Refine this draft; keep the current preview while AI works, review the reply and before/after edits, and save changed drafts as new versions
-- **My applications** — local folders containing the original resume, JD, tailored versions and reports; track applications, interviews, notes and learning/coding practice
+- **My applications** — local folders by default, or an optional private Supabase library per Landwise account; retain original resumes, JDs, tailored versions and reports, and track interviews, notes and practice
 - **Skills gap** — surfaces JD requirements your resume can't support, instead of inventing them
 - **Length-aware PDF & DOCX export** — default to the original PDF page count, check the rendered layout and keep exported content within the selected limit
 - **PDF upload** — drag-and-drop your existing resume as a PDF
@@ -56,11 +56,11 @@ Use **Refine draft** to jump to the follow-up section below a completed resume. 
 
 Changed revisions save a new application version with the follow-up request and reply. A no-change response keeps the existing saved version; that response stays in the current session until a later changed revision saves the recent history. The current draft carries up to ten recent follow-up exchanges.
 
-Files live in `~/Documents/Landwise/Applications`, outside the repository, with private folder/file permissions. Each folder holds `application.json` plus version folders with the original resume, JD, tailored text and report. This is the local operating-system user's library, accessible in the local app independently of which ChatGPT account is selected. It is **not** cloud storage, a separate Landwise account, or cross-device sync. Deleting a folder in the app deletes its local versions and progress. If saving fails, the finished draft remains available for export and **Save application** retries saving without another AI call.
+In default local mode, files live in `~/Documents/Landwise/Applications`, outside the repository, with private folder/file permissions. Each folder holds `application.json` plus version folders with the original resume, JD, tailored text and report. This is the local operating-system user's library, accessible in the local app independently of which ChatGPT account is selected. It is **not** cloud storage, a separate Landwise account, or cross-device sync. Deleting a folder in the app deletes its local versions and progress. If saving fails, the finished draft remains available for export and **Save application** retries saving without another AI call.
 
 The editor can replace only selected existing bullet lines (at most 35% rounded up, with a minimum allowance of one). It cannot replace the full resume, remove an experience or add a new role. Facts must stay with their original role/project. Before/after bullets are available in the fit report. Text without recognized bullet markers stays unchanged. The score uses extracted requirements: must-haves weigh twice as much, direct evidence earns full credit, related evidence half, and absent evidence zero. It is a source-evidence estimate, not an ATS score or a hiring prediction. Missing evidence is not proof that you lack a skill.
 
-Typing and signing in do not start AI generation. An explicit analysis or transform sends the required resume/job text to OpenAI and uses your plan allowance. A transform normally makes three sequential requests to read the sources, match requirements and write the draft. If the draft exceeds the page limit, it makes at most one additional request to tighten the wording. Provider failures are not retried automatically. **Manage usage** opens ChatGPT’s controls. Career events and local PDF parsing work without sign-in.
+Typing and signing in do not start AI generation. An explicit analysis or transform sends the required resume/job text to OpenAI and uses your plan allowance. A transform normally makes three sequential requests to read the sources, match requirements and write the draft. If the draft exceeds the page limit, it makes at most one additional request to tighten the wording. Provider failures are not retried automatically. **Manage usage** opens ChatGPT’s controls. Career events work without sign-in. PDF parsing also works without sign-in in local storage mode; cloud storage mode requires a Landwise account.
 
 Saved registrations can be selected after restarting. **Sign out** attempts to revoke the renewable session, clears local credentials, and retains the account/client mapping for reconnecting. If remote revocation cannot be confirmed, Landwise tells you to disconnect it in ChatGPT settings.
 
@@ -71,6 +71,11 @@ Use **Career events** to find places to meet employers, check the organizer’s 
 The first visit to **Career events** requests browser location permission. If allowed, the closest cities appear first within the event and calendar groups. Distances are approximate straight-line distances to city centers, not venues or driving distances. Choose **Soonest first** to sort by date, or use the **Location** filter if location access is declined or unavailable. Returning to the tab does not request location again during the same visit; **Use my location** or **Update location** retries explicitly.
 
 Location uses the browser's Geolocation API and needs HTTPS in production (localhost works for development). No Google Maps API key is required. Landwise rounds coordinates to two decimal places and keeps them only in memory for the current visit; it does not send them to the server or an external geocoding service.
+
+For optional per-user cloud application storage, see [Supabase setup](./docs/SUPABASE.md).
+Supabase mode uses a separate email sign-in, owner-scoped database access and
+account-switch cleanup. The sponsored first-transform ledger is prepared but
+not connected to AI billing. The ChatGPT runtime remains loopback-only.
 
 ### Maintaining the career directory
 
@@ -107,7 +112,7 @@ Open **http://127.0.0.1:5174** (use this exact host, not `localhost`, for the lo
 
 Optional configuration is shown in `.env.example`. If you change the frontend port, update Vite and `LANDWISE_APP_ORIGIN` together. If you change `PORT`, update Vite’s API proxy too.
 
-ChatGPT credentials are stored outside the checkout under `~/.config/landwise` by default, with owner-only directory/file permissions. Set `LANDWISE_AUTH_DIR` to use another private directory. The stable host identifier and registrations are reused; only one Landwise process may use a credential directory at a time. Tokens never enter browser storage or application logs. Browser cookies identify local sessions; state, nonce, PKCE, signature verification, origin checks, and CSRF protection guard sign-in and AI requests.
+ChatGPT credentials are stored outside the checkout under `~/.config/landwise` by default, with owner-only directory/file permissions. Set `LANDWISE_AUTH_DIR` to use another private directory. The stable host identifier and registrations are reused; only one Landwise process may use a credential directory at a time. ChatGPT tokens never enter browser storage or application logs. In optional cloud mode, the separate Landwise account session is persisted by the Supabase SDK in browser storage. Browser cookies identify local sessions; state, nonce, PKCE, signature verification, origin checks, and CSRF protection guard sign-in and AI requests.
 
 
 ---
@@ -147,6 +152,9 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full technical breakdown.
 | `PORT` | No | Loopback API port; default `3001` |
 | `LANDWISE_APP_ORIGIN` | No | Exact local frontend origin; default `http://127.0.0.1:5174` |
 | `LANDWISE_AUTH_DIR` | No | Private credential directory; default `~/.config/landwise` |
+| `LANDWISE_APPLICATION_STORAGE` | No | `local` (default) or `supabase` |
+| `SUPABASE_URL` | Cloud mode | HTTPS project origin |
+| `SUPABASE_PUBLISHABLE_KEY` | Cloud mode | Public browser-safe key; secret/service-role keys rejected |
 
 Provider API-key variables are not used for the resume workflow.
 

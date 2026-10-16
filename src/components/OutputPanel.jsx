@@ -31,7 +31,7 @@ function documentFilename(text, job) {
   return `${slug || 'tailored'}-resume`;
 }
 
-export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false, revising = false, children }) {
+export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false, revising = false, storage = 'local', children }) {
   const [copyState, setCopyState] = useState('');
   const [tab, setTab] = useState('resume');
   const [expanded, setExpanded] = useState(false);
@@ -168,7 +168,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
         {progress?.complete ? `Ready in ${Math.round(progress.elapsedMs / 1000)} seconds` : ''}
       </p>}
       <div className="result-save">
-        {result.savedApplication ? <><span>Saved in your local application folder.</span><a href={`#applications/${result.savedApplication.id}`}>View application ↗</a></>
+        {result.savedApplication ? <><span>{storage === 'supabase' || result.savedApplication.storage === 'supabase' ? 'Saved in your Landwise application library.' : 'Saved in your local application folder.'}</span><a href={`#applications/${result.savedApplication.id}`}>View application ↗</a></>
           : <><span>{result.saveError || 'Keep this draft, its job description and fit report together.'}</span>{onSave && <button onClick={onSave} disabled={loading || revising || saving}>{saving ? 'Saving…' : 'Save application'}</button>}</>}
       </div>
       <span className="result-sr-only" role="status">{copyState === 'copied' ? 'Resume copied to clipboard.' : ''}</span>

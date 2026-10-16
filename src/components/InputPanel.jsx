@@ -3,7 +3,7 @@ import ResumeAnalysis from './ResumeAnalysis';
 
 const wordCount = text => text.trim() ? text.trim().split(/\s+/u).length : 0;
 
-export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0, onUploadingChange, children }) {
+export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0, onUploadingChange, authorizeHeaders, csrfToken, uploadAllowed = true, accountRequired = false, children }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [fileName, setFileName] = useState('');
@@ -15,7 +15,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
   useEffect(() => () => uploadRef.current?.abort(), []);
 
   async function handleFile(file) {
-    if (!file || disabled) return;
+    if (!file || disabled || !uploadAllowed) return;
     if (file.type !== 'application/pdf') {
       setUploadError('Only PDF files are supported. You can also paste your resume below.');
       return;
@@ -32,7 +32,12 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
     const formData = new FormData();
     formData.append('resume', file);
     try {
-      const response = await fetch('/api/parse-pdf', { method: 'POST', body: formData, signal: controller.signal });
+      const response = await fetch('/api/parse-pdf', {
+        method: 'POST',
+        headers: { ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}), ...(authorizeHeaders ? await authorizeHeaders() : {}) },
+        body: formData,
+        signal: controller.signal,
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not read this PDF.');
       if (!controller.signal.aborted) {
@@ -72,13 +77,13 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
             <label className="field-label" htmlFor="resume-text"><span className="label-badge">1</span>Your resume</label>
             <span className="field-hint">PDF or text</span>
           </div>
-          <input ref={fileInputRef} type="file" accept=".pdf" hidden disabled={disabled}
+          <input ref={fileInputRef} type="file" accept=".pdf" hidden disabled={disabled || !uploadAllowed}
             onChange={event => { handleFile(event.target.files[0]); event.target.value = ''; }} />
           <button
             type="button"
             className={'drop-zone' + (dragging ? ' drag-over' : '')}
             aria-label="Upload your resume as a PDF"
-            disabled={disabled}
+            disabled={disabled || !uploadAllowed}
             onClick={() => fileInputRef.current?.click()}
             onDragOver={event => { event.preventDefault(); if (!disabled) setDragging(true); }}
             onDragLeave={() => setDragging(false)}
@@ -93,6 +98,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
             </span>
             <span className="drop-plus" aria-hidden="true">+</span>
           </button>
+          {accountRequired && <p className="review-hint">Sign in to Landwise above to upload your PDF or use AI. You can still paste text here.</p>}
           {uploadError && <p className="upload-error" role="alert">{uploadError}</p>}
           <textarea
             id="resume-text"
@@ -113,7 +119,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
               <button className="resume-review-button" onClick={onAnalyze} disabled={!aiReady || disabled || retryIn > 0}>
                 <span>Analyze my resume</span><span>{retryIn > 0 ? retryIn + 's' : '+'}</span>
               </button>
-              {!aiReady && <p className="review-hint">Connect your ChatGPT plan for optional resume feedback.</p>}
+              {!aiReady && <p className="review-hint">{accountRequired ? 'Sign in to Landwise, then connect your ChatGPT plan for resume feedback.' : 'Connect your ChatGPT plan for optional resume feedback.'}</p>}
             </>}
           </div>}
         </div>

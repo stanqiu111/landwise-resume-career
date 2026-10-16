@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { applicationRequest } from '../applicationApi';
 import OutputPanel from './OutputPanel';
 import './Applications.css';
@@ -6,7 +6,7 @@ import './Applications.css';
 const STAGES = [['resume', 'Resume ready'], ['applied', 'Applied'], ['interview', 'Interview'], ['offer', 'Offer'], ['closed', 'Closed']];
 const date = value => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-function ApplicationDetail({ application, onUpdate, onRestore, onRemove, busy }) {
+function ApplicationDetail({ application, onUpdate, onRestore, onRemove, busy, storage }) {
   const [company, setCompany] = useState(application.company);
   const [roleTitle, setRoleTitle] = useState(application.roleTitle);
   const [stage, setStage] = useState(application.stage);
@@ -43,17 +43,17 @@ function ApplicationDetail({ application, onUpdate, onRestore, onRemove, busy })
       <details><summary>Saved job description</summary><pre>{version.jobDescription}</pre></details>
       <details><summary>Original resume</summary><pre>{version.resume}</pre></details>
     </div>
-    <OutputPanel key={version.id} result={{ ...version.result, savedApplication: { id: application.id } }}>
+    <OutputPanel key={version.id} storage={storage} result={{ ...version.result, savedApplication: { id: application.id } }}>
       <div className="saved-follow-up"><h3>Want to refine this version?</h3><p>Open this draft in the studio to ask AI for small changes. Your original resume and saved versions stay together.</p><button onClick={() => onRestore(version)} disabled={busy}>Refine this saved draft</button></div>
     </OutputPanel>
-    <div className="application-folder"><p>Local folder: <code>{application.folder}</code></p><p>Stored on this computer for your local user. No cloud sync. Export PDF or Word from the saved version above.</p>
-      {confirmDelete ? <div role="alert"><p>Delete this application folder, all saved versions and progress?</p><button className="application-delete" disabled={busy} onClick={onRemove}>Delete folder</button><button onClick={() => setConfirmDelete(false)}>Keep it</button></div>
+    <div className="application-folder">{storage === 'supabase' ? <p>Saved to your Landwise account. Export PDF or Word from the saved version above.</p> : <><p>Local folder: <code>{application.folder}</code></p><p>Stored on this computer for your local user. No cloud sync. Export PDF or Word from the saved version above.</p></>}
+      {confirmDelete ? <div role="alert"><p>Delete this application, all saved versions and progress?</p><button className="application-delete" disabled={busy} onClick={onRemove}>{storage === 'supabase' ? 'Delete application' : 'Delete folder'}</button><button onClick={() => setConfirmDelete(false)}>Keep it</button></div>
         : <button onClick={() => setConfirmDelete(true)}>Delete application…</button>}
     </div>
   </div>;
 }
 
-export default function Applications({ active, selectedId, csrfToken, revision, onRestore, onNotify }) {
+export default function Applications({ active, selectedId, csrfToken, revision, onRestore, onNotify, authorizeHeaders, storage = 'local' }) {
   const [library, setLibrary] = useState({ applications: [], folder: '' });
   const [detail, setDetail] = useState(null);
   const [query, setQuery] = useState('');
@@ -62,38 +62,49 @@ export default function Applications({ active, selectedId, csrfToken, revision, 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const mutationRef = useRef(null);
+  useEffect(() => () => mutationRef.current?.abort(), []);
   useEffect(() => {
     if (!active || !csrfToken) return;
-    let cancelled = false;
+    const controller = new AbortController();
     async function load() {
       setLoading(true); setError('');
       try {
-        const [list, app] = await Promise.all([applicationRequest('list', {}, csrfToken), selectedId ? applicationRequest('get', { id: selectedId }, csrfToken) : null]);
-        if (!cancelled) { setLibrary(list); setDetail(app); }
-      } catch (failure) { if (!cancelled) setError(failure.message); }
-      finally { if (!cancelled) setLoading(false); }
+        const options = { authorizeHeaders, signal: controller.signal };
+        const [list, app] = await Promise.all([applicationRequest('list', {}, csrfToken, options), selectedId ? applicationRequest('get', { id: selectedId }, csrfToken, options) : null]);
+        if (!controller.signal.aborted) { setLibrary(list); setDetail(app); }
+      } catch (failure) { if (!controller.signal.aborted) setError(failure.message); }
+      finally { if (!controller.signal.aborted) setLoading(false); }
     }
     load();
-    return () => { cancelled = true; };
-  }, [active, csrfToken, selectedId, revision, refresh]);
+    return () => controller.abort();
+  }, [active, csrfToken, selectedId, revision, refresh, authorizeHeaders]);
   async function update(patch) {
+    if (mutationRef.current) return;
+    const controller = new AbortController(); mutationRef.current = controller;
     setBusy(true); setError('');
-    try { const app = await applicationRequest('update', { id: detail.id, patch }, csrfToken); setDetail(app); setRefresh(value => value + 1); onNotify('Application progress saved.'); }
-    catch (failure) { setError(failure.message); }
-    finally { setBusy(false); }
+    try {
+      const app = await applicationRequest('update', { id: detail.id, patch }, csrfToken, { authorizeHeaders, signal: controller.signal });
+      if (!controller.signal.aborted) { setDetail(app); setRefresh(value => value + 1); onNotify('Application progress saved.'); }
+    } catch (failure) { if (!controller.signal.aborted) setError(failure.message); }
+    finally { if (mutationRef.current === controller) { mutationRef.current = null; if (!controller.signal.aborted) setBusy(false); } }
   }
   async function remove() {
+    if (mutationRef.current) return;
+    const controller = new AbortController(); mutationRef.current = controller;
     setBusy(true); setError('');
-    try { await applicationRequest('remove', { id: detail.id }, csrfToken); setDetail(null); window.location.hash = '#applications'; setRefresh(value => value + 1); onNotify('Application folder deleted.'); }
-    catch (failure) { setError(failure.message); }
-    finally { setBusy(false); }
+    try {
+      await applicationRequest('remove', { id: detail.id }, csrfToken, { authorizeHeaders, signal: controller.signal });
+      if (!controller.signal.aborted) { setDetail(null); window.location.hash = '#applications'; setRefresh(value => value + 1); onNotify('Application deleted.'); }
+    } catch (failure) { if (!controller.signal.aborted) setError(failure.message); }
+    finally { if (mutationRef.current === controller) { mutationRef.current = null; if (!controller.signal.aborted) setBusy(false); } }
   }
   const visible = library.applications.filter(app => `${app.company} ${app.roleTitle}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'all' || app.stage === filter));
   return <div className="applications-page">
-    <div className="studio-hero"><div><p className="studio-eyebrow">From resume to your next step</p><h1>My applications</h1><p className="studio-description">Your drafts, fit reports and preparation, organized by company and role. Saved on this computer.</p></div><a className="application-button" href="#resume">Tailor a resume</a></div>
+    <div className="studio-hero"><div><p className="studio-eyebrow">From resume to your next step</p><h1>My applications</h1><p className="studio-description">Your drafts, fit reports and preparation, organized by company and role. {storage === 'supabase' ? 'Saved to your Landwise account.' : 'Saved on this computer.'}</p></div><a className="application-button" href="#resume">Tailor a resume</a></div>
     {error && <div className="application-error" role="alert">{error}<button onClick={() => setRefresh(value => value + 1)}>Retry</button></div>}
     {selectedId && <a className="application-back" href="#applications">← All applications</a>}
-    {loading || !csrfToken ? <p role="status">Opening application folders…</p> : selectedId ? detail?.id === selectedId && <ApplicationDetail key={detail.id} application={detail} busy={busy} onUpdate={update} onRemove={remove} onRestore={onRestore} /> : <>
+    {loading || !csrfToken ? <p role="status">Opening your applications…</p> : selectedId ? detail?.id === selectedId && <ApplicationDetail key={detail.id} application={detail} storage={storage} busy={busy} onUpdate={update} onRemove={remove} onRestore={onRestore} /> : <>
       <div className="application-filters"><input aria-label="Search applications" placeholder="Search company or role" value={query} onChange={e => setQuery(e.target.value)} /><select aria-label="Filter by application progress" value={filter} onChange={e => setFilter(e.target.value)}><option value="all">All stages</option>{STAGES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select><span>{visible.length} {visible.length === 1 ? 'application' : 'applications'}</span></div>
       <div className="application-grid">{visible.map(app => <a className="application-card application-tile" href={`#applications/${app.id}`} key={app.id}><span className="application-company">{app.company || 'Company not specified'}</span><h2>{app.roleTitle}</h2><span className="application-stage">{STAGES.find(([value]) => value === app.stage)?.[1]}</span><div className="application-stats"><strong>{app.score ?? '—'}<small>/100 match</small></strong><span>{app.versionCount} saved {app.versionCount === 1 ? 'version' : 'versions'}<br />{app.practiceDone}/{app.practiceTotal} practice tasks</span></div><p>Updated {date(app.updatedAt)} <span className="application-button">Open folder</span></p></a>)}</div>
       {!visible.length && <div className="application-card application-empty"><h2>{library.applications.length ? 'No matching applications' : 'Your next opportunity starts here'}</h2><p>{library.applications.length ? 'Try a different search or stage.' : 'Tailor a resume to create your first folder. The original, job description, draft and fit report will stay together here.'}</p><a href="#resume">Go to resume studio ↗</a></div>}
