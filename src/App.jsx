@@ -9,6 +9,15 @@ import useAICooldown from './useAICooldown';
 import { estimateResumePages } from './resumeLayout';
 import './App.css';
 
+function revealConnection() {
+  requestAnimationFrame(() => {
+    const section = document.getElementById('ai-connection');
+    const disclosure = section?.closest('details');
+    if (disclosure) disclosure.open = true;
+    section?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+}
+
 export default function App() {
   const [page, setPage] = useState(() => window.location.hash === '#career-events' ? 'events' : 'resume');
   const [resume, setResumeRaw] = useState('');
@@ -18,6 +27,7 @@ export default function App() {
   const maxPages = pageLimitOverride ?? sourcePages ?? estimatedPages;
   const [jobDescription, setJobDescription] = useState('');
   const [result, setResult] = useState(null);
+  const [resultInputs, setResultInputs] = useState(null);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(null);
   const [transformError, setTransformError] = useState(null);
@@ -37,9 +47,7 @@ export default function App() {
   useEffect(() => {
     function followLocation() {
       setPage(window.location.hash === '#career-events' ? 'events' : 'resume');
-      if (window.location.hash === '#ai-connection') {
-        requestAnimationFrame(() => document.getElementById('ai-connection')?.scrollIntoView({ block: 'center' }));
-      }
+      if (window.location.hash === '#ai-connection') revealConnection();
     }
     window.addEventListener('hashchange', followLocation);
     return () => window.removeEventListener('hashchange', followLocation);
@@ -49,7 +57,7 @@ export default function App() {
     const section = page === 'events' ? eventsPageRef.current : resumePageRef.current;
     section?.focus({ preventScroll: true });
     if (window.location.hash === '#ai-connection') {
-      document.getElementById('ai-connection')?.scrollIntoView({ block: 'center' });
+      revealConnection();
     } else window.scrollTo({ top: 0, behavior: 'instant' });
   }, [page]);
 
@@ -108,11 +116,11 @@ export default function App() {
   async function handleTransform() {
     if (transformRequestRef.current || analysisRequestRef.current || cooldown.retryIn) return;
     if (!connection.session?.sharing) {
-      document.getElementById('ai-connection')?.scrollIntoView({ block: 'center' });
+      revealConnection();
       showToast('Choose your ChatGPT account to continue.');
       return;
     }
-    if (!aiReady) { showToast('Choose an available ChatGPT model first.'); return; }
+    if (!aiReady) { revealConnection(); showToast('Choose an available ChatGPT model first.'); return; }
     if (!resume.trim()) { showToast('Please upload or paste your resume first.'); return; }
     if (!jobDescription.trim()) { showToast('Please fill out the job description.'); return; }
     setToast('');
@@ -134,7 +142,10 @@ export default function App() {
       const data = await readTransformResponse(res, update => {
         if (!controller.signal.aborted) setProgress(update);
       });
-      if (!controller.signal.aborted) setResult(data);
+      if (!controller.signal.aborted) {
+        setResult(data);
+        setResultInputs({ resume, jobDescription, maxPages });
+      }
     } catch (err) {
       if (!controller.signal.aborted) cooldown.record(err);
       let message = err.message;
@@ -166,13 +177,13 @@ export default function App() {
       )}
 
       <header className="app-header">
-        <div className="header-left">
-          <div className="header-logo">✦</div>
+        <a className="header-left" href="#resume" aria-label="Landwise resume studio">
+          <span className="header-logo" aria-hidden="true">L<span /></span>
           <div className="header-title-wrap">
-            <h1>Landwise</h1>
-            <span className="header-sub">Land the job, wisely.</span>
+            <span className="header-wordmark">landwise<span>.</span></span>
+            <span className="header-sub">A little clarity. Your next opportunity.</span>
           </div>
-        </div>
+        </a>
         <nav className="primary-nav" aria-label="Main navigation">
           <a href="#resume" aria-current={page === 'resume' ? 'page' : undefined}>Resume studio</a>
           <a href="#career-events" aria-current={page === 'events' ? 'page' : undefined}>Career events</a>
@@ -183,22 +194,20 @@ export default function App() {
       <main className="app-main">
         <section className="app-page" ref={resumePageRef} tabIndex={-1} hidden={page !== 'resume'} aria-label="Resume studio">
           <div className="studio-hero">
-            <p className="studio-eyebrow"><span aria-hidden="true">✦</span> A little clarity for your next chapter</p>
-            <h2>Your experience, <br /><em>beautifully put to work.</em></h2>
-            <p>Build a resume that sounds like you. Discover the people and<br className="desktop-break" /> opportunities that help you take the next step.</p>
-            <div className="studio-hero-actions">
-              <button onClick={() => resumePageRef.current?.querySelector('textarea')?.focus()}>Work on my resume <span aria-hidden="true">→</span></button>
-              <a href="#career-events">Explore career events <span aria-hidden="true">↗</span></a>
+            <div className="studio-intro">
+              <p className="studio-eyebrow">Built around your experience</p>
+              <h1>Your resume. A better fit.</h1>
+              <p className="studio-description">Bring your experience and a job description. Create a clearer, more relevant resume.</p>
             </div>
-            <div className="studio-features" aria-label="Resume studio features">
-              <span><span aria-hidden="true">✓</span> Your experience, kept honest</span>
-              <span><span aria-hidden="true">✓</span> Tailored to the role</span>
-              <span><span aria-hidden="true">✓</span> Ready to share</span>
-            </div>
+            <ol className="studio-steps" aria-label="Resume tailoring steps">
+              {[['01', 'Add details'], ['02', 'Tailor'], ['03', 'Review & export']].map(([number, label], index) => (
+                <li key={number} aria-current={index === (loading ? 1 : result ? 2 : 0) ? 'step' : undefined}>
+                  <span>{number}</span>{label}
+                </li>
+              ))}
+            </ol>
           </div>
           <div className="studio-workspace">
-            <div className="studio-workspace-heading"><h3>A fresh start for your resume.</h3><p>Your story in. A clearer next step out.</p></div>
-            <AIConnection connection={connection} mode="full" />
             <div className="panels">
               <InputPanel
                 resume={resume}
@@ -214,24 +223,29 @@ export default function App() {
                 maxPages={maxPages}
                 setMaxPages={setPageLimitOverride}
                 retryIn={cooldown.retryIn}
-              />
-
-              <div className="transform-center">
-                <div className="divider-line" />
-                <button
-                  className={`transform-btn${loading ? ' loading' : ''}`}
-                  onClick={handleTransform}
-                  disabled={loading || analyzing || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
-                >
-                  {loading ? (
-                    <><span className="spinner" /> Transforming...</>
-                  ) : (
-                    cooldown.retryIn > 0 ? `Wait ${cooldown.retryIn}s` : connection.session?.sharing ? '✦ Transform' : 'Sign in to transform'
-                  )}
-                </button>
-                {loading && <button className="cancel-transform" onClick={() => transformRequestRef.current?.abort()}>Cancel</button>}
-                <div className="divider-line" />
-              </div>
+              >
+                {uploading => <>
+                  <details className="connection-settings">
+                    <summary>
+                      <span className="connection-summary-copy">AI account & model</span>
+                      <span className="connection-summary-state">{connection.loading ? 'Checking…' : aiReady ? 'Connected' : 'Set up ChatGPT'}</span>
+                      <span className="connection-summary-toggle" aria-hidden="true">+</span>
+                    </summary>
+                    <AIConnection connection={connection} mode="full" />
+                  </details>
+                  <div className="transform-actions">
+                    <button
+                      className={`transform-btn${loading ? ' loading' : ''}`}
+                      onClick={handleTransform}
+                      disabled={loading || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
+                    >
+                      {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : 'Tailor my resume'}<span aria-hidden="true">↗</span></>}
+                    </button>
+                    {loading && <button className="cancel-transform" onClick={() => transformRequestRef.current?.abort()}>Cancel tailoring</button>}
+                    <p className="transform-note">Built from your experience. Review before you apply.</p>
+                  </div>
+                </>}
+              </InputPanel>
 
               <OutputPanel
                 result={result}
@@ -239,6 +253,7 @@ export default function App() {
                 progress={progress}
                 error={transformError}
                 retryIn={cooldown.retryIn}
+                stale={Boolean(resultInputs && (resultInputs.resume !== resume || resultInputs.jobDescription !== jobDescription || resultInputs.maxPages !== maxPages))}
               />
             </div>
           </div>

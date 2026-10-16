@@ -18,6 +18,7 @@ Landwise is a local resume tailoring app with career-event discovery. Connect an
 - **Length-aware PDF & DOCX export** — default to the original PDF page count, check the rendered layout and keep exported content within the selected limit
 - **PDF upload** — drag-and-drop your existing resume as a PDF
 - **Readable output** — clear section hierarchy and bullets in the preview, PDF, and DOCX
+- **Focused workspace** — a white, gray, black, and blue two-column layout, collapsible account settings, and separate Resume, Changes, and Evidence views
 - **Career events** — student-oriented career fairs and organizer calendars across Canada and the United States, with original sources, dates, and eligibility
 - **Event discovery** — search and filter by country, location, school, and access; save resources in your browser or copy an organizer’s link
 - **Nearby events** — request browser location when Career events first opens, sort by approximate distance, or switch to soonest first
@@ -45,7 +46,7 @@ Landwise is a local resume tailoring app with career-event discovery. Connect an
 1. Open **http://127.0.0.1:5174** and click **Continue with ChatGPT**.
 2. Complete ChatGPT’s own sign-in and approve plan usage for Landwise. Eligible plans and usage limits are controlled by OpenAI.
 3. Return to Landwise, choose a model from your account’s catalog, and upload or paste your resume. PDF uploads set the output page limit automatically; for pasted text, review the estimated limit and adjust it if needed.
-4. Click **Analyze my resume** for feedback, or add a job description and click **Transform** to tailor it.
+4. Click **Analyze my resume** for feedback, or add a job description and click **Tailor my resume**. Review the **Resume**, **Changes**, and **Evidence** tabs, then use **Full screen**, **Copy text**, **PDF**, or **DOCX**. Account and model settings are available beneath the inputs or from the header's connection link.
 
 Typing and signing in do not start AI generation. An explicit analysis or transform sends the required resume/job text to OpenAI and uses your plan allowance. A transform normally makes three sequential requests to read the sources, match requirements and write the draft. If the draft exceeds the page limit, it makes at most one additional request to tighten the wording. Provider failures are not retried automatically. **Manage usage** opens ChatGPT’s controls. Career events and local PDF parsing work without sign-in.
 
