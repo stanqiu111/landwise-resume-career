@@ -1,5 +1,6 @@
 .applications-page { min-width: 0; }
-.applications-page .studio-hero > a { font-size: 12px; white-space: nowrap; }
+.application-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-height: 40px; padding: 9px 14px; border: 1px solid var(--accent); border-radius: 5px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 600; line-height: 1.5; text-decoration: none; white-space: nowrap; transition: background .15s, border-color .15s; }
+a.application-button:hover, .application-tile:hover .application-button, .application-tile:focus-visible .application-button { background: var(--accent-hover); border-color: var(--accent-hover); }
 .application-filters { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
 .applications-page input:not([type=checkbox]), .applications-page select, .applications-page textarea { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 5px; background: #fff; padding: 10px 12px; color: var(--text); font-size: 13px; }
 .application-filters input { max-width: 370px; }
@@ -16,8 +17,7 @@
 .application-stats strong { font-size: 26px; font-weight: 600; }
 .application-stats small { display: block; font-size: 11px; color: var(--text-muted); font-weight: 400; margin-top: 4px; }
 .application-stats > span { font-size: 11px; color: var(--text-dim); line-height: 1.8; text-align: right; }
-.application-tile > p { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; justify-content: space-between; border-top: 1px solid #edf0f4; padding-top: 16px; font-size: 10px; color: var(--text-muted); margin-top: auto; }
-.application-tile > p > span { color: var(--accent); }
+.application-tile > p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; width: 100%; justify-content: space-between; border-top: 1px solid #edf0f4; padding-top: 16px; font-size: 10px; color: var(--text-muted); margin-top: auto; }
 .application-empty { text-align: center; padding: 65px 25px; }
 .application-empty h2 { font-size: 22px; }
 .application-empty p { max-width: 460px; line-height: 1.8; margin: 14px auto 24px; color: var(--text-dim); }
