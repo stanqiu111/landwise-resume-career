@@ -160,6 +160,32 @@ test('network failures, invalid JSON and malformed success responses are sanitiz
   await assert.rejects(storeWith(async () => response({ removed: false })).remove(APP_ID), error => error.status === 502);
 });
 
+test('only recognized database quota tags become fixed storage-limit messages', async () => {
+  const limits = [
+    ['landwise_application_limit', /50-application/],
+    ['landwise_version_limit', /10-version/],
+    ['landwise_user_storage_limit', /5 MiB/],
+    ['landwise_global_storage_limit', /Cloud storage is currently full/],
+    ['landwise_history_limit', /100-event/],
+  ];
+  for (const [details, wording] of limits) {
+    let calls = 0;
+    const store = storeWith(async () => {
+      calls++;
+      return response({ code: 'P0001', details, message: `PRIVATE-SQL ${config.accessToken}` }, 400);
+    });
+    await assert.rejects(store.save(inputs), error => error.status === 409 && error.code === 'storage_limit'
+      && wording.test(error.message) && !error.message.includes('PRIVATE-SQL') && !error.message.includes(config.accessToken));
+    assert.equal(calls, 1);
+  }
+  for (const details of ['not-a-quota', 'constructor', '__proto__', 'landwise_user_storage_limit PRIVATE-SQL', { tag: 'landwise_user_storage_limit' }]) {
+    const store = storeWith(async () => response({ code: 'P0001', details, message: 'PRIVATE-SQL' }, 400));
+    await assert.rejects(store.save(inputs), error => error.status === 502 && error.code === 'cloud_application_error' && !error.message.includes('PRIVATE-SQL'));
+  }
+  const wrongCode = storeWith(async () => response({ code: '22023', details: 'landwise_user_storage_limit' }, 400));
+  await assert.rejects(wrongCode.save(inputs), error => error.status === 400 && error.code === 'application_error');
+});
+
 test('a token that expires after store creation is rejected before any later RPC', async () => {
   let currentTime = NOW;
   let calls = 0;

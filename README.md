@@ -77,6 +77,11 @@ Supabase mode uses a separate email sign-in, owner-scoped database access and
 account-switch cleanup. The sponsored first-transform ledger is prepared but
 not connected to AI billing. The ChatGPT runtime remains loopback-only.
 
+The Vercel deployment is a separate **public preview**, built with
+`npm run build:public`: career events are available without signup, while resume
+tailoring is clearly marked coming soon. It includes no local account controls,
+AI server, or Supabase connection. See [deployment status and limits](./docs/DEPLOYMENT.md).
+
 ### Maintaining the career directory
 
 Listings are curated in `src/data/careerEvents.js`, not fetched automatically. Each record links to an original organizer website and includes the date its source was checked. Recheck dates, eligibility, venue, and registration on the source before updating `verifiedOn`. Add confirmed dates as `kind: 'event'`; use `kind: 'calendar'` for ongoing organizer resources without a confirmed date. Dated events leave the directory after their final day, using the visitor’s local date. Calendars remain available and should be reviewed periodically.

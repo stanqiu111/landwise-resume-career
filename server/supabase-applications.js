@@ -81,8 +81,19 @@ function applicationId(id) {
   return id;
 }
 
-function remoteError(status, code) {
+const STORAGE_LIMIT_MESSAGES = new Map([
+  ['landwise_application_limit', 'Your library has reached its 50-application limit. Remove an application before saving another.'],
+  ['landwise_version_limit', 'This application has reached its 10-version limit. Your existing versions and current draft have been kept.'],
+  ['landwise_user_storage_limit', 'Your library has reached its 5 MiB storage limit. Remove an application or shorten saved notes. Your current draft is still available.'],
+  ['landwise_global_storage_limit', 'Cloud storage is currently full. Download your draft and try saving later.'],
+  ['landwise_history_limit', 'This application has reached its 100-event history limit. Existing history is kept; notes can still be edited.'],
+]);
+
+function remoteError(status, code, details) {
   if (status === 401 || code === 'PGRST301' || code === 'PGRST302') return signInError();
+  if (code === 'P0001' && STORAGE_LIMIT_MESSAGES.has(details)) {
+    return failure(STORAGE_LIMIT_MESSAGES.get(details), 409, 'storage_limit');
+  }
   if (code === 'P0002') return failure('This application was not found in your account.', 404);
   if (status === 403 || code === '42501') return failure('Your account cannot access this application.', 403);
   if (code === '22023') return failure('Check the application details and try again.', 400);
@@ -150,7 +161,7 @@ export function createSupabaseApplicationStore({
       throw remoteError(response.ok ? 502 : response.status);
     }
     checkAbort();
-    if (!response.ok) throw remoteError(response.status, data?.code);
+    if (!response.ok) throw remoteError(response.status, data?.code, data?.details);
     if (!accepts(data)) throw remoteError(502);
     return data;
   }

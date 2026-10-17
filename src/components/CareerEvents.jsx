@@ -87,7 +87,7 @@ function ResourceCard({ resource, saved, onSave, onShare, userLocation }) {
   );
 }
 
-export default function CareerEvents({ active, onNotify }) {
+export default function CareerEvents({ active, onNotify, publicPreview = false }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [savedOnly, setSavedOnly] = useState(false);
   const [savedIds, setSavedIds] = useState(readSaved);
@@ -169,7 +169,7 @@ export default function CareerEvents({ active, onNotify }) {
             <h3>Your next move, in one place.</h3>
             <p>Find an event. Check who’s hiring. <br />Bring a resume that tells your story.</p>
           </div>
-          <a href="#resume">Prepare your resume <span aria-hidden="true">→</span></a>
+          <a href="#resume">{publicPreview ? 'Resume tailoring · Coming soon' : <>Prepare your resume <span aria-hidden="true">→</span></>}</a>
         </aside>
       </div>
 
@@ -265,9 +265,9 @@ export default function CareerEvents({ active, onNotify }) {
         <ol>
           <li><span>01</span><div><strong>Choose your employers</strong><p>Check the organizer’s employer list and pick a few you’d like to meet.</p></div></li>
           <li><span>02</span><div><strong>Prepare your introduction</strong><p>Share what you study, what you’ve built, and the kind of role you’re exploring.</p></div></li>
-          <li><span>03</span><div><strong>Tailor your application</strong><p>Find a role you like, then bring its job description to the resume studio.</p></div></li>
+          <li><span>03</span><div><strong>{publicPreview ? 'Keep the role in mind' : 'Tailor your application'}</strong><p>{publicPreview ? 'Save job descriptions that interest you, and review your relevant experience before applying.' : 'Find a role you like, then bring its job description to the resume studio.'}</p></div></li>
         </ol>
-        <a href="#resume">Work on my resume <span aria-hidden="true">→</span></a>
+        <a href="#resume">{publicPreview ? 'See what’s coming to Landwise' : <>Work on my resume <span aria-hidden="true">→</span></>}</a>
       </aside>
     </div>
   );

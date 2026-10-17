@@ -15,7 +15,10 @@ the Landwise library: the Supabase account owns it.
 1. Apply `supabase/migrations/202610160001_landwise_foundation.sql` once to the
    selected project. The migration is additive and transactional, with only
    `landwise_*` tables/functions and the `landwise_private` schema. Do not rerun a
-   successful migration; record it in your normal migration history.
+   successful migration; record it in your normal migration history. Then apply
+   `202610170001_landwise_storage_limits.sql` once to enforce the free-launch
+   budgets. Both migrations are already applied to the selected Personal project;
+   see [deployment status](./DEPLOYMENT.md).
 2. In Supabase Authentication, enable email sign-in and configure an appropriate
    email delivery service for public use. Add the exact Landwise origin to the
    allowed redirect URLs. Local testing uses `http://127.0.0.1:5174/`; production
@@ -49,6 +52,12 @@ exportable if a later cloud save fails.
 
 ## Sponsored first transform
 
+The database now caps each user at 50 applications and 5 MiB of serialized saved
+payload, each application at 10 versions and 100 history events, and all users
+together at 100 MiB of payload. Atomic triggers enforce these limits for direct
+RPC requests too. Existing drafts are never evicted. Deletion and smaller edits
+reclaim quota; payload size does not include PostgreSQL disk overhead.
+
 The migration prepares a private lifetime trial ledger. Only the backend service
 role can call `landwise_trial_reserve`, `landwise_trial_complete` and
 `landwise_trial_release`; browser users cannot grant or reset trials.
@@ -71,6 +80,8 @@ credential isolation, durable job/idempotency handling, and provider admission
 limits shared across workers. The existing ChatGPT OAuth host remains restricted
 to loopback; Supabase storage alone does not make this runtime ready for a public
 multi-user deployment. No visitor is billed to the owner's plan by this change.
+The ledger currently uses account identities; the requested first tailoring
+without signup still needs a separate guest identity and recovery design.
 
 ## Validation
 
