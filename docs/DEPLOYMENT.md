@@ -8,15 +8,16 @@ Current URL: **https://landwise-nu.vercel.app**. Vercel project
 `personal-93a7/landwise` is on Hobby, connected to `stanqiu111/landwise`, production
 branch `main`.
 
-The last verified public deployment is the static career-events preview. The
-API-funded resume service below is implemented and tested locally; it has
-**not been activated remotely**. A successful local build or the new
-`vercel.json` does not establish that public AI is live.
+The hosted studio and API are deployed. **Paid AI and public account sign-in
+remain disabled** until their activation checks are complete. Deployment
+`dpl_8Rk9DxrDD6QYbWnkx5EEkr8hPgcU` from commit `e9f6b69` reached Ready on
+October 17, 2026. No paid provider call was made.
 
 | Item | Verified state |
 | --- | --- |
-| Public career-events preview | Deployed at the URL above |
-| Hosted API, guest identity, spending ledger and UI | Local implementation and automated tests |
+| Hosted studio and career events | Deployed at the URL above |
+| Hosted API and guest identity | Live configuration and secure cookie verified; AI disabled |
+| Shared spending ledger | Applied; automated tests and live permission checks pass |
 | Foundation and application storage-limit migrations | Applied to the selected Supabase project |
 | AI budget migration, `202610170002_landwise_ai_budget.sql` (migration003) | Applied remotely; permissions/counts verified |
 | Hosted OpenAI API key | Not configured or used for a live test |
@@ -35,6 +36,12 @@ Six hosted environment settings have been saved in Vercel, including the
 session secret, public Supabase configuration and both feature flags set to
 false. This does not activate inference; the API and service-role keys are
 still absent.
+
+Live checks: `/api/health`, `/api/storage/config` and `/api/session` return JSON
+200 with `Cache-Control: no-store`. Session availability is false with reason
+`configuration`, and its cookie is Secure/HttpOnly. The public config contains
+only Supabase's publishable key and settings. `/api/auth/session`, `/.env` and
+`/server.js` return 404. The live browser showed no console errors.
 
 ## Hosted pilot architecture and limits
 
@@ -215,8 +222,9 @@ npm audit
 ```
 
 An inspected production artifact can be prepared with
-`vercel build --prod --scope personal-93a7` and published with
-`vercel deploy --prebuilt --prod --scope personal-93a7`. Linked Git pushes use
+`vercel build --prod --scope personal-93a7`. Deploy from source on Vercel/Linux
+through a linked Git push or `vercel --prod --scope personal-93a7`; do not upload
+a macOS prebuilt native parser bundle. Linked Git pushes use
 the current `vercel.json`; changing that file can change what the next push
 deploys. The earlier preview's 404 API checks are historical evidence only,
 not validation of the new hosted endpoints.
