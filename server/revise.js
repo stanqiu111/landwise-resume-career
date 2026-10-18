@@ -23,7 +23,7 @@ const Request = z.object({
     report: z.object({ items: z.array(z.object({ id: z.string(), resumeQuote: z.string().max(2000).default(''), nextStep: z.string().max(2000).default('') })).max(150) }).optional(),
     improvements: z.array(z.string().max(2000)).max(50).default([]),
     pageLimit: z.number().optional(),
-    savedApplication: z.object({ id: z.string().max(100), versionId: z.string().max(100).optional(), folder: z.string().max(2000).optional(), company: z.string().max(160).optional(), roleTitle: z.string().max(160).optional(), stage: z.string().max(30).optional(), versionCount: z.number().optional(), createdAt: z.string().max(40).optional(), updatedAt: z.string().max(40).optional(), score: z.number().optional(), practiceDone: z.number().optional(), practiceTotal: z.number().optional() }).optional(),
+    savedApplication: z.object({ id: z.string().max(100), versionId: z.string().max(100).optional(), folder: z.string().max(2000).nullable().optional(), company: z.string().max(160).optional(), roleTitle: z.string().max(160).optional(), stage: z.string().max(30).optional(), versionCount: z.number().optional(), createdAt: z.string().max(40).optional(), updatedAt: z.string().max(40).optional(), score: z.number().optional(), practiceDone: z.number().optional(), practiceTotal: z.number().optional() }).optional(),
     saveError: z.string().max(1000).optional(),
   }),
   maxPages: z.unknown().optional(),

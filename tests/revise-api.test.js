@@ -44,7 +44,7 @@ test('one follow-up edits the current draft once, preserves history, refreshes r
   let calls = 0;
   let saved;
   const prior = studentResume.replace('Created a planner', 'Built a planner');
-  const body = fixture({ transformedResume: prior, savedApplication: { id: 'old-folder', versionId: 'old-version' },
+  const body = fixture({ transformedResume: prior, savedApplication: { id: 'old-folder', versionId: 'old-version', folder: null },
     revisionHistory: [{ instruction: 'Shorten the planner bullet.', reply: 'Shortened it.', createdAt: '2026-10-16T12:00:00.000Z', changed: true }] });
   const post = await harness(t, { getClient: async (req, model) => {
     assert.equal(model, 'selected-model');

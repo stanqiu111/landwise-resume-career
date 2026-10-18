@@ -3,7 +3,7 @@ import ResumeAnalysis from './ResumeAnalysis';
 
 const wordCount = text => text.trim() ? text.trim().split(/\s+/u).length : 0;
 
-export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0, onUploadingChange, authorizeHeaders, csrfToken, uploadAllowed = true, accountRequired = false, children }) {
+export default function InputPanel({ resume, setResume, jobDescription, setJobDescription, analysis, analyzing, onAnalyze, aiReady, aiBusy, sourcePages, maxPages, setMaxPages, retryIn = 0, onUploadingChange, authorizeHeaders, csrfToken, uploadAllowed = true, accountRequired = false, maxUploadMB = 10, analysisUnavailableReason = '', retryingAnalysis = false, children }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [fileName, setFileName] = useState('');
@@ -20,8 +20,8 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
       setUploadError('Only PDF files are supported. You can also paste your resume below.');
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('PDF must be 10 MB or smaller.');
+    if (file.size > maxUploadMB * 1024 * 1024) {
+      setUploadError(`PDF must be ${maxUploadMB} MB or smaller.`);
       return;
     }
     setUploadError('');
@@ -94,7 +94,7 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
             </span>
             <span className="drop-copy">
               <span className="drop-text">{uploading ? 'Reading your PDF…' : 'Upload your resume'}</span>
-              <span className="drop-hint">{fileName ? fileName + ' · Choose a file to replace' : 'Choose a file or drop it here · PDF, up to 10 MB'}</span>
+              <span className="drop-hint">{fileName ? fileName + ' · Choose a file to replace' : `Choose a file or drop it here · PDF, up to ${maxUploadMB} MB`}</span>
             </span>
             <span className="drop-plus" aria-hidden="true">+</span>
           </button>
@@ -117,9 +117,9 @@ export default function InputPanel({ resume, setResume, jobDescription, setJobDe
           {resume && <div className="resume-review">
             {analysis || analyzing ? <ResumeAnalysis analysis={analysis} analyzing={analyzing} /> : <>
               <button className="resume-review-button" onClick={onAnalyze} disabled={!aiReady || disabled || retryIn > 0}>
-                <span>Analyze my resume</span><span>{retryIn > 0 ? retryIn + 's' : '+'}</span>
+                <span>{retryingAnalysis ? 'Retry my last analysis' : 'Analyze my resume'}</span><span>{retryIn > 0 ? retryIn + 's' : '+'}</span>
               </button>
-              {!aiReady && <p className="review-hint">{accountRequired ? 'Sign in to Landwise, then connect your ChatGPT plan for resume feedback.' : 'Connect your ChatGPT plan for optional resume feedback.'}</p>}
+              {!aiReady && <p className="review-hint">{analysisUnavailableReason || (accountRequired ? 'Sign in to Landwise, then connect your ChatGPT plan for resume feedback.' : 'Connect your ChatGPT plan for optional resume feedback.')}</p>}
             </>}
           </div>}
         </div>

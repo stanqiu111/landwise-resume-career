@@ -15,6 +15,7 @@ function revisionKey(revision) {
 export default function ResumeFollowUp({
   result, onSubmit, busy = false, disabled = false, disabledReason = '',
   retryIn = 0, error = null, progress, onCancel,
+  requestAllowed = true, retryAllowed = false, retryInstruction = '',
 }) {
   const id = useId();
   const textareaRef = useRef(null);
@@ -23,7 +24,8 @@ export default function ResumeFollowUp({
   const [submitting, setSubmitting] = useState(false);
   const [submissionError, setSubmissionError] = useState('');
   const working = busy || submitting;
-  const unavailable = disabled || retryIn > 0;
+  const retryingRequest = retryAllowed && instruction.trim() === retryInstruction;
+  const unavailable = disabled || retryIn > 0 || (!requestAllowed && !retryingRequest);
   const latest = result?.revision;
   const seen = new Set(latest ? [revisionKey(latest)] : []);
   const history = (Array.isArray(result?.revisionHistory) ? result.revisionHistory : []).filter(item => {
@@ -108,7 +110,7 @@ export default function ResumeFollowUp({
         {error?.manageUsage && <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Manage ChatGPT usage <span aria-hidden="true">↗</span></a>}
       </div>}
       <div className="follow-up-actions">
-        <button className="follow-up-submit" type="submit" disabled={working || unavailable || !instruction.trim() || !onSubmit}>{working ? 'Updating…' : 'Update my resume'}</button>
+        <button className="follow-up-submit" type="submit" disabled={working || unavailable || !instruction.trim() || !onSubmit}>{working ? 'Updating…' : retryingRequest ? 'Retry my last update' : 'Update my resume'}</button>
         {working && onCancel && <button className="follow-up-cancel" type="button" onClick={onCancel}>Cancel update</button>}
         {working && <span className="follow-up-progress" role="status" aria-live="polite"><span aria-hidden="true" />{progressLabel}</span>}
       </div>

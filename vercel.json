@@ -1,9 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "npm run build:public",
-  "outputDirectory": "dist-public",
+  "buildCommand": "npm run build:hosted",
+  "outputDirectory": "dist-hosted",
   "installCommand": "npm ci",
+  "functions": {
+    "api/index.js": { "maxDuration": 300, "includeFiles": "server/hosted-pdf-worker.js" }
+  },
+  "rewrites": [{ "source": "/api/:path*", "destination": "/api" }],
   "headers": [
     {
       "source": "/(.*)",
@@ -12,7 +16,7 @@
         { "key": "X-Frame-Options", "value": "DENY" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "geolocation=(self), camera=(), microphone=()" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://audfewrmqgsefeutappd.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" }
       ]
     }
   ]

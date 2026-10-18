@@ -1,0 +1,19 @@
+.hosted-access { display: grid; gap: 11px; padding: 18px; border: 1px solid #dce4f3; border-radius: 7px; background: #f7f9fe; }
+.hosted-access-label { display: inline-block; margin-bottom: 7px; color: #62759c; font-size: 10px; font-weight: 600; }
+.hosted-access h3 { margin: 0 0 8px; color: #293752; font-size: 15px; font-weight: 600; line-height: 1.5; }
+.hosted-access p { margin: 0; color: #576681; font-size: 12px; line-height: 1.7; }
+.hosted-access p.hosted-access-detail { color: #6b778b; font-size: 11px; }
+.hosted-access p.hosted-access-error { padding: 10px; border-radius: 4px; background: #fff1f3; color: #8d2f35; }
+.hosted-access-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.hosted-access-actions button, .hosted-header-account, .hosted-handoff button { min-height: 36px; padding: 8px 11px; border: 1px solid #d5deef; border-radius: 5px; background: #fff; color: #3b5797; font-size: 11px; line-height: 1.5; text-decoration: none; cursor: pointer; }
+.hosted-access-actions button:hover, .hosted-header-account:hover, .hosted-handoff button:hover { background: #eef3ff; }
+.hosted-handoff { margin-bottom: 25px; padding: 20px; border: 1px solid #ccd9f5; border-radius: 7px; background: #f5f8ff; }
+.hosted-handoff h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.5; }
+.hosted-handoff p { margin: 0 0 12px; color: #5e6e89; font-size: 12px; line-height: 1.7; }
+.hosted-handoff button + button { margin-left: 8px; }
+.hosted-signup-after-result { padding: 20px; border-top: 1px solid var(--border); background: #fff; }
+.hosted-signup-after-result .landwise-account { margin: 0; padding: 18px; }
+.hosted-signup-after-result .landwise-account-form { min-width: 0; flex-basis: 100%; }
+.hosted-signup-after-result .landwise-account-form > div { flex-wrap: wrap; }
+.hosted-signup-after-result .landwise-account-form button { white-space: normal; }
+@media (max-width: 600px) { .hosted-signup-after-result { padding: 15px; } }

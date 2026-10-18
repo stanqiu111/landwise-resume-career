@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { accountWorkspaceKey, cloudAuthorizationHeaders, validateStorageConfig } from './cloudAccount';
+import { accountWorkspaceKey, canStartLandwiseSignIn, cloudAuthorizationHeaders, validateStorageConfig } from './cloudAccount';
 
-export default function useLandwiseAccount() {
+export default function useLandwiseAccount({ allowGuest = false } = {}) {
   const [config, setConfig] = useState(null);
   const [client, setClient] = useState(null);
   const [user, setUser] = useState(null);
@@ -28,7 +28,7 @@ export default function useLandwiseAccount() {
         const nextConfig = validateStorageConfig(await response.json());
         if (controller.signal.aborted) return;
         setConfig(nextConfig);
-        if (nextConfig.storage === 'local') { setLoading(false); return; }
+        if (nextConfig.storage !== 'supabase') { setLoading(false); return; }
         accountClient = createClient(nextConfig.url, nextConfig.publishableKey, {
           auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true },
         });
@@ -37,6 +37,7 @@ export default function useLandwiseAccount() {
           if (controller.signal.aborted) return;
           authRevision += 1;
           setUser(session?.user && !session.user.is_anonymous ? session.user : null);
+          if (session?.user && !session.user.is_anonymous) { setError(''); setNotice(''); }
           setLoading(false);
         });
         subscription = listener.data.subscription;
@@ -57,7 +58,9 @@ export default function useLandwiseAccount() {
   }, [attempt]);
 
   const retry = useCallback(() => { setLoading(true); setConfigError(''); setError(''); setAttempt(value => value + 1); }, []);
+  const signInEnabled = canStartLandwiseSignIn(config, allowGuest);
   const signIn = useCallback(async email => {
+    if (!signInEnabled) { setError('Account sign-in is being connected. You can still use your first tailoring and download it.'); return false; }
     if (!client || operationRef.current) return false;
     operationRef.current = true; setBusy(true); setError(''); setNotice('');
     try {
@@ -72,7 +75,7 @@ export default function useLandwiseAccount() {
       if (mounted.current) setError(failure.message || 'The sign-in link could not be sent. Please try again.');
       return false;
     } finally { operationRef.current = false; if (mounted.current) setBusy(false); }
-  }, [client]);
+  }, [client, signInEnabled]);
   const signOut = useCallback(async () => {
     if (!client || operationRef.current) return;
     operationRef.current = true; setBusy(true); setError(''); setNotice('');
@@ -85,7 +88,8 @@ export default function useLandwiseAccount() {
   }, [client]);
   const userId = user?.id;
   const authorizeHeaders = useCallback(() => cloudAuthorizationHeaders(client, userId), [client, userId]);
+  const authorizeAIHeaders = useCallback(() => cloudAuthorizationHeaders(client, userId, { allowGuest }), [client, userId, allowGuest]);
   const cloud = config?.storage === 'supabase';
-  return { config, cloud, user, loading, configError, error, notice, busy, retry, signIn, signOut, authorizeHeaders,
-    ready: !loading && !configError && (!cloud || Boolean(userId)), workspaceKey: accountWorkspaceKey(config, user) };
+  return { config, cloud, user, loading, configError, error, notice, busy, retry, signIn, signOut, signInEnabled, authorizeHeaders, authorizeAIHeaders,
+    ready: !loading && !configError && config?.storage !== 'unavailable' && (!cloud || Boolean(userId)), workspaceKey: accountWorkspaceKey(config, user) };
 }

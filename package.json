@@ -8,6 +8,7 @@
     "server": "node server.js",
     "build": "vite build",
     "build:public": "node scripts/build-public.mjs",
+    "build:hosted": "node scripts/build-hosted.mjs",
     "lint": "eslint .",
     "test": "node --test",
     "preview": "vite preview"

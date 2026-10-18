@@ -8,6 +8,7 @@ const config = { storage: 'supabase', url: 'https://project.supabase.co', publis
 test('storage configuration fails closed instead of treating broken cloud settings as local', () => {
   assert.deepEqual(validateStorageConfig({ storage: 'local', ignored: true }), { storage: 'local' });
   assert.deepEqual(validateStorageConfig(config), config);
+  assert.deepEqual(validateStorageConfig({ storage: 'unavailable', mode: 'hosted' }), { storage: 'unavailable', mode: 'hosted' });
   for (const value of [null, {}, { storage: 'supabase' }, { ...config, url: 'http://remote.example' }, { ...config, url: 'https://user:secret@example.com' }, { ...config, url: 'https://project.supabase.co/nested' }, { ...config, publishableKey: '' }]) {
     assert.throws(() => validateStorageConfig(value));
   }

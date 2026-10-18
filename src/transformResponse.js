@@ -16,7 +16,7 @@ export async function readTransformResponse(response, onProgress) {
   if (!response.ok || !response.headers.get('content-type')?.includes('application/x-ndjson')) {
     let data;
     try { data = await response.json(); }
-    catch { throw new Error('Landwise could not read the server response. Please check that the local server is running.'); }
+    catch { throw new Error('Landwise could not read the server response. Check your connection, then try again.'); }
     if (!response.ok) throw responseError(data);
     return validateResult(data);
   }

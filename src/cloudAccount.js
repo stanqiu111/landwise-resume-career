@@ -1,4 +1,5 @@
 export function validateStorageConfig(value) {
+  if (value?.storage === 'unavailable' && value.mode === 'hosted') return { storage: 'unavailable', mode: 'hosted', ...(typeof value.signInEnabled === 'boolean' ? { signInEnabled: value.signInEnabled } : {}) };
   if (value?.storage === 'local') return { storage: 'local' };
   if (value?.storage !== 'supabase' || typeof value.url !== 'string' || typeof value.publishableKey !== 'string' || !value.publishableKey.trim()) {
     throw new Error('Landwise storage is not configured correctly. Ask the server owner to check its settings.');
@@ -7,7 +8,11 @@ export function validateStorageConfig(value) {
   if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
     throw new Error('The Landwise account server address is invalid.');
   }
-  return { storage: 'supabase', url: url.href.replace(/\/$/, ''), publishableKey: value.publishableKey };
+  return { storage: 'supabase', url: url.href.replace(/\/$/, ''), publishableKey: value.publishableKey, ...(value.mode === 'hosted' ? { mode: 'hosted' } : {}), ...(typeof value.signInEnabled === 'boolean' ? { signInEnabled: value.signInEnabled } : {}) };
+}
+
+export function canStartLandwiseSignIn(config, hosted = false) {
+  return config?.storage === 'supabase' && (hosted ? config.signInEnabled === true : config.signInEnabled !== false);
 }
 
 export function accountWorkspaceKey(config, user) {
@@ -16,11 +21,12 @@ export function accountWorkspaceKey(config, user) {
 
 // This session is only a source of the access token. The server independently
 // verifies its identity and scopes every database operation to that user.
-export async function cloudAuthorizationHeaders(client, expectedUserId) {
+export async function cloudAuthorizationHeaders(client, expectedUserId, { allowGuest = false } = {}) {
   if (!client) return {};
-  if (!expectedUserId) throw new Error('Sign in to your Landwise account first.');
+  if (!expectedUserId && !allowGuest) throw new Error('Sign in to your Landwise account first.');
   const { data, error } = await client.auth.getSession();
   if (error) throw new Error('Your Landwise session could not be refreshed. Please sign in again.');
+  if (allowGuest && !expectedUserId && !data?.session) return {};
   if (!data?.session?.access_token || data.session.user?.id !== expectedUserId || data.session.user?.is_anonymous) {
     throw new Error('Your Landwise account changed or signed out. Please sign in again before continuing.');
   }

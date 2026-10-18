@@ -31,7 +31,7 @@ function documentFilename(text, job) {
   return `${slug || 'tailored'}-resume`;
 }
 
-export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false, revising = false, storage = 'local', children }) {
+export default function OutputPanel({ result, loading, progress, error, retryIn = 0, stale = false, onSave, saving = false, revising = false, storage = 'local', hosted = false, children }) {
   const [copyState, setCopyState] = useState('');
   const [tab, setTab] = useState('resume');
   const [expanded, setExpanded] = useState(false);
@@ -179,7 +179,7 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
     {!loading && stale && hasResult && <p className="result-notice result-stale" role="status">Your inputs have changed. Tailor again to update this draft.</p>}
 
     <div className={`result-canvas${loading ? ' is-loading' : ''}${hasResult && tab !== 'resume' ? ' is-details' : ''}`} aria-busy={loading}>
-      {loading && <TransformActivity progress={progress} />}
+      {loading && <TransformActivity progress={progress} hosted={hosted} />}
 
       {!loading && !hasResult && <div className="result-empty">
         <div className="result-empty-paper" aria-hidden="true"><span /><span /><span /><span /><span /></div>

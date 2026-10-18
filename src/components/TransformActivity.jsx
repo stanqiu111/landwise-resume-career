@@ -48,7 +48,7 @@ function ActivityNote({ notes }) {
   return <p className="workbench-note" key={index}>{notes[index]}</p>;
 }
 
-export default function TransformActivity({ progress }) {
+export default function TransformActivity({ progress, hosted = false }) {
   const [startedAt] = useState(Date.now);
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function TransformActivity({ progress }) {
   const currentId = running?.id || steps.at(-1)?.id || 'connection';
   const task = currentId === 'shortening'
     ? { ...tasks[2], title: 'Making every line count.', notes: ['Tightening the wording to fit your original page limit.'] }
-    : tasks.find(item => item.id === currentId) || preparation;
+    : tasks.find(item => item.id === currentId) || (hosted ? { ...preparation, notes: ['Preparing your resume request. Your story is up next.'] } : preparation);
   const elapsed = Math.floor(Math.max(now - startedAt, progress?.elapsedMs || 0) / 1000);
   const time = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 

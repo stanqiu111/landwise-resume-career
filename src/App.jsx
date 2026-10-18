@@ -9,11 +9,16 @@ import AIConnection from './components/AIConnection';
 import LandwiseAccount from './components/LandwiseAccount';
 import useLandwiseAccount from './useLandwiseAccount';
 import useAIConnection from './useAIConnection';
+import useHostedConnection from './useHostedConnection';
+import HostedAccess from './components/HostedAccess';
+import { createHostedRequestIds, guestDraftForAccount, hostedActionAccess, hostedFailureMessage, validateHostedInputs } from './hostedAccess';
 import { readTransformResponse } from './transformResponse';
 import useAICooldown from './useAICooldown';
 import { estimateResumePages } from './resumeLayout';
 import { createReadyChime } from './readyChime';
 import './App.css';
+
+const HOSTED = import.meta.env.VITE_LANDWISE_HOSTED === 'true';
 
 function currentPage() { return window.location.hash.startsWith('#applications') ? 'applications' : window.location.hash === '#career-events' ? 'events' : 'resume'; }
 
@@ -27,7 +32,13 @@ function revealConnection() {
 }
 
 export default function App() {
-  const account = useLandwiseAccount();
+  const account = useLandwiseAccount({ allowGuest: HOSTED });
+  const [guestHandoff, setGuestHandoff] = useState(null);
+  useEffect(() => {
+    if (!guestHandoff) return;
+    const timer = setTimeout(() => setGuestHandoff(current => current === guestHandoff ? null : current), Math.max(0, guestHandoff.expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [guestHandoff]);
   if (account.loading || account.configError) return <main className="landwise-startup">
     <h1>Landwise</h1>
     {account.loading ? <p role="status">Opening your workspace…</p> : <><p role="alert">{account.configError}</p><button onClick={account.retry}>Try again</button></>}
@@ -35,10 +46,24 @@ export default function App() {
   // A different Landwise user gets a fresh subtree. Token refreshes keep the
   // same key, while sign-out/account switches unmount every private draft,
   // library view and upload/request controller before another user sees them.
-  return <Workspace key={account.workspaceKey} account={account} />;
+  return HOSTED ? <HostedWorkspace key={account.workspaceKey} account={account}
+    guestDraft={guestDraftForAccount(guestHandoff, account.user)}
+    onPrepareGuestDraft={(email, draft) => setGuestHandoff(draft ? { email: email.trim().toLowerCase(), draft, expiresAt: Date.now() + 30 * 60 * 1000 } : null)}
+    onDiscardGuestDraft={() => setGuestHandoff(null)} />
+    : <LocalWorkspace key={account.workspaceKey} account={account} />;
 }
 
-function Workspace({ account }) {
+function LocalWorkspace({ account }) {
+  const connection = useAIConnection();
+  return <Workspace account={account} connection={connection} />;
+}
+
+function HostedWorkspace(props) {
+  const connection = useHostedConnection({ authorizeHeaders: props.account.authorizeAIHeaders, signInEnabled: props.account.signInEnabled });
+  return <Workspace {...props} connection={connection} hosted />;
+}
+
+function Workspace({ account, connection, hosted = false, guestDraft, onPrepareGuestDraft, onDiscardGuestDraft }) {
   const [readyChime] = useState(createReadyChime);
   const [page, setPage] = useState(currentPage);
   const [applicationId, setApplicationId] = useState(() => window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
@@ -63,9 +88,17 @@ function Workspace({ account }) {
   const [toastUsage, setToastUsage] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const connection = useAIConnection();
-  const cooldown = useAICooldown(connection.session?.account?.id);
-  const aiReady = Boolean(account.ready && connection.session?.connected && connection.session?.sharing && connection.selectedModel && !connection.busy && !connection.connecting);
+  const [showAccount, setShowAccount] = useState(() => window.location.hash === '#landwise-account');
+  const [retryRevisionInstruction, setRetryRevisionInstruction] = useState('');
+  const [hostedRequestIds] = useState(createHostedRequestIds);
+  const cooldown = useAICooldown(hosted ? account.user?.id || 'hosted-guest' : connection.session?.account?.id);
+  const transformAccess = hostedActionAccess(connection.session, Boolean(account.user), 'transform', account.signInEnabled);
+  const followUpAccess = hostedActionAccess(connection.session, Boolean(account.user), 'revise', account.signInEnabled);
+  const retryHostedTransform = hosted && hostedRequestIds.canRetry('transform', { resume, jobDescription, model: connection.selectedModel, maxPages }, connection.session);
+  const retryHostedAnalysis = hosted && hostedRequestIds.canRetry('analyze', { resume, model: connection.selectedModel }, connection.session);
+  const retryHostedRevision = hosted && Boolean(retryRevisionInstruction) && hostedRequestIds.canRetry('revise', { ...resultInputs, result, instruction: retryRevisionInstruction, model: connection.selectedModel }, connection.session);
+  const aiReady = hosted ? Boolean(connection.session?.csrfToken && (transformAccess.allowed || retryHostedTransform)) : Boolean(account.ready && connection.session?.connected && connection.session?.sharing && connection.selectedModel && !connection.busy && !connection.connecting);
+  const authorizeAI = hosted ? account.authorizeAIHeaders : account.authorizeHeaders;
   const generationRef = useRef(0);
   const analysisRequestRef = useRef(null);
   const transformRequestRef = useRef(null);
@@ -83,6 +116,7 @@ function Workspace({ account }) {
       setPage(currentPage());
       setApplicationId(window.location.hash.startsWith('#applications/') ? window.location.hash.slice(14) : '');
       if (window.location.hash === '#ai-connection') revealConnection();
+      if (window.location.hash === '#landwise-account') setShowAccount(true);
     }
     window.addEventListener('hashchange', followLocation);
     return () => window.removeEventListener('hashchange', followLocation);
@@ -119,15 +153,45 @@ function Workspace({ account }) {
 
   function showToast(msg, usage = false) {
     setToast(msg);
-    setToastUsage(usage);
+    setToastUsage(!hosted && usage);
     setTimeout(() => setToast(''), 5000);
+  }
+
+  function openAccount() {
+    setShowAccount(true);
+    window.location.hash = '#landwise-account';
+    requestAnimationFrame(() => document.getElementById('landwise-account')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+  }
+
+  async function beginSignIn(email) {
+    if (hosted && !account.user) onPrepareGuestDraft?.(email, result && resultInputs ? { resume, jobDescription, result, resultInputs, sourcePages, maxPages } : null);
+    const success = await account.signIn(email);
+    if (!success) onDiscardGuestDraft?.();
+    return success;
+  }
+
+  function importGuestDraft() {
+    if (!guestDraft || loading || analyzing || refining || saving || inputUploading) return;
+    const { savedApplication: _saved, saveError: _error, ...draft } = guestDraft.result;
+    void _saved; void _error;
+    setResumeRaw(guestDraft.resume); setJobDescription(guestDraft.jobDescription);
+    setSourcePages(guestDraft.sourcePages); setPageLimitOverride(guestDraft.maxPages);
+    setResult(draft); setResultInputs(guestDraft.resultInputs); setAnalysis(null);
+    setTransformError(null); setRevisionError(null); setProgress(null);
+    setFollowUpKey(value => value + 1); onDiscardGuestDraft?.();
+    window.location.hash = '#resume';
+    showToast('Your guest draft is open. Choose Save application to keep it in this account.');
   }
 
   async function handleAnalyze() {
     if (analysisRequestRef.current || transformRequestRef.current || revisionRequestRef.current || inputUploading || cooldown.retryIn) return;
+    if (hosted && !followUpAccess.allowed && !retryHostedAnalysis) { if (followUpAccess.signIn) openAccount(); showToast(followUpAccess.message); return; }
     if (!account.ready) { showToast('Sign in to your Landwise account first.'); return; }
-    if (!aiReady) { showToast('Connect your ChatGPT plan and choose a model first.'); return; }
+    if (!(hosted ? followUpAccess.allowed || retryHostedAnalysis : aiReady)) { showToast(hosted ? transformAccess.message : 'Connect your ChatGPT plan and choose a model first.'); return; }
     if (!resume.trim()) { showToast('Please upload or paste your resume first.'); return; }
+    const payload = { resume, model: connection.selectedModel };
+    if (hosted && validateHostedInputs(resume, '', payload)) { showToast(validateHostedInputs(resume, '', payload)); return; }
+    const requestId = hosted ? hostedRequestIds.for('analyze', payload) : null;
     const requestVersion = ++generationRef.current;
     analysisRequestRef.current?.abort();
     const controller = new AbortController();
@@ -136,26 +200,29 @@ function Workspace({ account }) {
     try {
       const response = await fetch('/api/analyze-resume', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': connection.session.csrfToken, ...await account.authorizeHeaders() },
-        body: JSON.stringify({ resume, model: connection.selectedModel }),
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': connection.session.csrfToken, ...(requestId ? { 'X-Request-ID': requestId } : {}), ...await authorizeAI() },
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       const data = await response.json();
-      if (!response.ok) throw Object.assign(new Error(data.error || 'Could not analyze this resume.'), { manageUsage: Boolean(data.manageUsageUrl), retryAfterSeconds: data.retryAfterSeconds });
-      if (!controller.signal.aborted && requestVersion === generationRef.current) setAnalysis(data);
+      if (!response.ok) throw Object.assign(new Error(data.error || 'Could not analyze this resume.'), { code: data.code, manageUsage: Boolean(data.manageUsageUrl), retryAfterSeconds: data.retryAfterSeconds });
+      if (!controller.signal.aborted && requestVersion === generationRef.current) { setAnalysis(data); if (hosted) hostedRequestIds.complete('analyze'); }
     } catch (error) {
       if (!controller.signal.aborted) cooldown.record(error);
-      if (error.name !== 'AbortError') showToast(error.message, error.manageUsage);
+      if (hosted) hostedRequestIds.failed('analyze', error, { aborted: controller.signal.aborted });
+      if (error.name !== 'AbortError') { if (hosted) connection.recordFailure(error); showToast(hosted ? hostedFailureMessage(error, Boolean(account.user), account.signInEnabled) : error.message, error.manageUsage); }
     } finally {
       if (analysisRequestRef.current === controller) analysisRequestRef.current = null;
       if (requestVersion === generationRef.current) setAnalyzing(false);
+      if (hosted) connection.refresh();
     }
   }
 
   async function handleTransform() {
     if (transformRequestRef.current || analysisRequestRef.current || revisionRequestRef.current || saving || inputUploading || cooldown.retryIn) return;
-    if (!account.ready) { showToast('Sign in to your Landwise account before tailoring a resume.'); return; }
-    if (!connection.session?.sharing) {
+    if (hosted && !aiReady) { if (transformAccess.signIn) openAccount(); showToast(transformAccess.message); return; }
+    if (!hosted && !account.ready) { showToast('Sign in to your Landwise account before tailoring a resume.'); return; }
+    if (!hosted && !connection.session?.sharing) {
       revealConnection();
       showToast('Choose your ChatGPT account to continue.');
       return;
@@ -163,6 +230,9 @@ function Workspace({ account }) {
     if (!aiReady) { revealConnection(); showToast('Choose an available ChatGPT model first.'); return; }
     if (!resume.trim()) { showToast('Please upload or paste your resume first.'); return; }
     if (!jobDescription.trim()) { showToast('Please fill out the job description.'); return; }
+    const payload = { resume, jobDescription, model: connection.selectedModel, maxPages };
+    if (hosted && validateHostedInputs(resume, jobDescription, payload)) { showToast(validateHostedInputs(resume, jobDescription, payload)); return; }
+    const requestId = hosted ? hostedRequestIds.for('transform', payload) : null;
     readyChime.prepare();
     setToast('');
     setLoading(true);
@@ -178,8 +248,8 @@ function Workspace({ account }) {
     try {
       const res = await fetch('/api/transform', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken, ...await account.authorizeHeaders() },
-        body: JSON.stringify({ resume, jobDescription, model: connection.selectedModel, maxPages }),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken, ...(requestId ? { 'X-Request-ID': requestId } : {}), ...await authorizeAI() },
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       const data = await readTransformResponse(res, update => {
@@ -189,34 +259,46 @@ function Workspace({ account }) {
         setResult(data);
         setResultInputs({ resume, jobDescription, maxPages });
         setFollowUpKey(value => value + 1);
+        if (hosted) hostedRequestIds.complete('transform');
         readyChime.play();
       }
     } catch (err) {
       if (!controller.signal.aborted) cooldown.record(err);
-      let message = err.message;
+      let message = hosted ? hostedFailureMessage(err, Boolean(account.user), account.signInEnabled) : err.message;
+      if (hosted) {
+        connection.recordFailure(err);
+        hostedRequestIds.failed('transform', err, { aborted: controller.signal.aborted });
+        if (['guest_limit', 'sign_in_required', 'cloud_sign_in_required'].includes(err.code) || (err.code === 'hosted_ai_allowance_used' && !account.user)) setShowAccount(true);
+      }
       if (controller.signal.aborted) {
         message = controller.signal.reason?.name === 'TimeoutError'
           ? controller.signal.reason.message : 'Transform was cancelled. Your inputs are still here.';
       } else if (['session_required', 'invalid_csrf'].includes(err.code)) {
         await connection.refresh();
-        message = 'Your connection was refreshed. Choose your saved ChatGPT account and try again.';
+        message = hosted ? 'Your session was refreshed. Please try again.' : 'Your connection was refreshed. Choose your saved ChatGPT account and try again.';
       }
-      setTransformError({ message, manageUsage: err.manageUsage });
+      setTransformError({ message, manageUsage: !hosted && err.manageUsage });
     } finally {
       clearTimeout(timeout);
       if (transformRequestRef.current === controller) {
         transformRequestRef.current = null;
         setLoading(false);
       }
+      if (hosted) connection.refresh();
     }
   }
 
   async function handleRefine(instruction) {
     if (!result || !resultInputs || revisionRequestRef.current || transformRequestRef.current || analysisRequestRef.current || saving || inputUploading || cooldown.retryIn) return false;
+    const payload = { ...resultInputs, result, instruction: instruction.trim(), model: connection.selectedModel };
+    const recovering = hosted && hostedRequestIds.canRetry('revise', payload, connection.session);
+    if (hosted && !followUpAccess.allowed && !recovering) { if (followUpAccess.signIn) openAccount(); setRevisionError({ message: followUpAccess.message }); return false; }
     if (!account.ready) { setRevisionError({ message: 'Sign in to your Landwise account before refining your draft.' }); return false; }
     if (staleResult) { setRevisionError({ message: 'Your inputs changed. Tailor again before refining this draft.' }); return false; }
-    if (!aiReady) { revealConnection(); setRevisionError({ message: 'Choose your ChatGPT account and an available model first.' }); return false; }
+    if (!(hosted ? followUpAccess.allowed || recovering : aiReady)) { if (!hosted) revealConnection(); setRevisionError({ message: hosted ? transformAccess.message : 'Choose your ChatGPT account and an available model first.' }); return false; }
     if (!instruction.trim() || instruction.trim().length > 2000) return false;
+    if (hosted && validateHostedInputs(resultInputs.resume, resultInputs.jobDescription, payload)) { setRevisionError({ message: validateHostedInputs(resultInputs.resume, resultInputs.jobDescription, payload) }); return false; }
+    const requestId = hosted ? hostedRequestIds.for('revise', payload) : null;
     readyChime.prepare();
     const controller = new AbortController();
     revisionRequestRef.current = controller;
@@ -225,8 +307,8 @@ function Workspace({ account }) {
     try {
       const response = await fetch('/api/revise', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken, ...await account.authorizeHeaders() },
-        body: JSON.stringify({ ...resultInputs, result, instruction: instruction.trim(), model: connection.selectedModel }),
+        headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson', 'X-CSRF-Token': connection.session.csrfToken, ...(requestId ? { 'X-Request-ID': requestId } : {}), ...await authorizeAI() },
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       const revised = await readTransformResponse(response, update => {
@@ -234,22 +316,28 @@ function Workspace({ account }) {
       });
       if (controller.signal.aborted) return false;
       setResult(revised); setProgress(null); setTransformError(null);
+      if (hosted) { hostedRequestIds.complete('revise'); setRetryRevisionInstruction(''); }
       readyChime.play();
       showToast(revised.transformedResume === result.transformedResume ? 'AI feedback is ready. Your draft is unchanged.' : revised.savedApplication ? 'Updated your draft and saved a new application version.' : 'Your revised draft is ready.');
       return true;
     } catch (failure) {
       if (!controller.signal.aborted) cooldown.record(failure);
-      let message = failure.message;
+      let message = hosted ? hostedFailureMessage(failure, Boolean(account.user), account.signInEnabled) : failure.message;
+      if (hosted) {
+        connection.recordFailure(failure);
+        setRetryRevisionInstruction(hostedRequestIds.failed('revise', failure, { aborted: controller.signal.aborted }) ? instruction.trim() : '');
+      }
       if (controller.signal.aborted) message = controller.signal.reason?.name === 'TimeoutError' ? controller.signal.reason.message : 'Revision cancelled. Your previous draft and request are still here.';
       else if (['session_required', 'invalid_csrf'].includes(failure.code)) {
         await connection.refresh();
-        message = 'Your connection was refreshed. Choose your saved account and try your revision again.';
+        message = hosted ? 'Your session was refreshed. Please try your revision again.' : 'Your connection was refreshed. Choose your saved account and try your revision again.';
       }
-      setRevisionError({ message, manageUsage: failure.manageUsage });
+      setRevisionError({ message, manageUsage: !hosted && failure.manageUsage });
       return false;
     } finally {
       clearTimeout(timeout);
       if (revisionRequestRef.current === controller) { revisionRequestRef.current = null; setRefining(false); }
+      if (hosted) connection.refresh();
     }
   }
 
@@ -306,11 +394,15 @@ function Workspace({ account }) {
           <a href="#applications" aria-current={page === 'applications' ? 'page' : undefined}>My applications</a>
           <a href="#career-events" aria-current={page === 'events' ? 'page' : undefined}>Career events</a>
         </nav>
-        <AIConnection connection={connection} mode="compact" />
+        {hosted ? account.cloud && (account.user || account.signInEnabled) && <button type="button" className="hosted-header-account" onClick={openAccount}>{account.user ? 'My account' : 'Sign in · Free'}</button> : <AIConnection connection={connection} mode="compact" />}
       </header>
 
       <main className="app-main">
-        <LandwiseAccount account={account} />
+        {(!hosted || account.user || showAccount || page === 'applications') && <LandwiseAccount account={account} hosted={hosted} afterDraft={Boolean(result)} onSignIn={beginSignIn} />}
+        {hosted && account.user && guestDraft && <section className="hosted-handoff" aria-label="Bring your guest draft into this account">
+          <h2>Your guest draft is still here.</h2><p>Open it in this account, then choose Save application to keep it. Opening replaces any unsaved inputs currently in the studio.</p>
+          <button onClick={importGuestDraft} disabled={loading || analyzing || refining || saving || inputUploading}>Open my guest draft</button><button onClick={onDiscardGuestDraft}>Discard guest draft</button>
+        </section>}
         <section className="app-page" ref={resumePageRef} tabIndex={-1} hidden={page !== 'resume'} aria-label="Resume studio">
           <div className="studio-hero">
             <div className="studio-intro">
@@ -329,10 +421,13 @@ function Workspace({ account }) {
           <div className="studio-workspace">
             <div className="panels">
               <InputPanel
-                authorizeHeaders={account.authorizeHeaders}
+                authorizeHeaders={authorizeAI}
                 csrfToken={connection.session?.csrfToken}
-                uploadAllowed={account.ready && (!account.cloud || Boolean(connection.session?.csrfToken))}
-                accountRequired={account.cloud && !account.user}
+                uploadAllowed={hosted ? Boolean(connection.session?.csrfToken && connection.session?.reason !== 'configuration') : account.ready && (!account.cloud || Boolean(connection.session?.csrfToken))}
+                accountRequired={!hosted && account.cloud && !account.user}
+                maxUploadMB={hosted ? 2 : 10}
+                analysisUnavailableReason={hosted ? followUpAccess.message : ''}
+                retryingAnalysis={retryHostedAnalysis}
                 resume={resume}
                 setResume={setResume}
                 jobDescription={jobDescription}
@@ -340,7 +435,7 @@ function Workspace({ account }) {
                 analysis={analysis}
                 analyzing={analyzing}
                 onAnalyze={handleAnalyze}
-                aiReady={aiReady}
+                aiReady={hosted ? followUpAccess.allowed || retryHostedAnalysis : aiReady}
                 aiBusy={loading || refining}
                 onUploadingChange={setInputUploading}
                 sourcePages={sourcePages}
@@ -349,32 +444,33 @@ function Workspace({ account }) {
                 retryIn={cooldown.retryIn}
               >
                 {uploading => <>
-                  <details className="connection-settings">
+                  {hosted ? <HostedAccess connection={connection} signedIn={Boolean(account.user)} accountAvailable={account.cloud && account.signInEnabled} onSignIn={openAccount} /> : <details className="connection-settings">
                     <summary>
                       <span className="connection-summary-copy">AI account & model</span>
                       <span className="connection-summary-state">{connection.loading ? 'Checking…' : aiReady ? 'Connected' : 'Set up ChatGPT'}</span>
                       <span className="connection-summary-toggle" aria-hidden="true">+</span>
                     </summary>
                     <AIConnection connection={connection} mode="full" />
-                  </details>
+                  </details>}
                   <div className="transform-actions">
                     <button
                       className={`transform-btn${loading ? ' loading' : ''}`}
                       onClick={handleTransform}
-                      disabled={!account.ready || loading || refining || saving || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
+                      disabled={(hosted ? !aiReady : !account.ready) || loading || refining || saving || analyzing || uploading || cooldown.retryIn > 0 || connection.loading || connection.busy || connection.connecting}
                     >
-                      {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : 'Tailor my resume'}<span aria-hidden="true">↗</span></>}
+                      {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : retryHostedTransform ? 'Retry my last tailoring' : 'Tailor my resume'}{!hosted && <span aria-hidden="true">↗</span>}</>}
                     </button>
                     {loading && <button className="cancel-transform" onClick={() => transformRequestRef.current?.abort()}>Cancel tailoring</button>}
-                    <p className="transform-note">{account.cloud && !account.user ? 'Sign in to Landwise above, then connect your ChatGPT plan to tailor a resume.' : `Keeps your roles and projects. Saves completed drafts in My applications ${account.cloud ? 'in your Landwise account' : 'on this computer'}.`}</p>
+                    <p className="transform-note">{hosted ? account.user ? 'Keeps your roles and projects. Completed drafts save to your application library.' : account.signInEnabled ? 'Keeps your roles and projects. Download your first draft, or create a free account to save it.' : 'Keeps your roles and projects. Download your first draft; account saving is coming soon.' : account.cloud && !account.user ? 'Sign in to Landwise above, then connect your ChatGPT plan to tailor a resume.' : `Keeps your roles and projects. Saves completed drafts in My applications ${account.cloud ? 'in your Landwise account' : 'on this computer'}.`}</p>
                   </div>
                 </>}
               </InputPanel>
 
               <OutputPanel
                 storage={account.cloud ? 'supabase' : 'local'}
+                hosted={hosted}
                 result={result}
-                onSave={saveApplication}
+                onSave={hosted && !account.user ? account.signInEnabled ? openAccount : undefined : saveApplication}
                 saving={saving}
                 loading={loading}
                 revising={refining}
@@ -385,18 +481,22 @@ function Workspace({ account }) {
               >
                 {result && <ResumeFollowUp key={followUpKey}
                   result={result} onSubmit={handleRefine} busy={refining}
-                  disabled={staleResult || !aiReady || analyzing || inputUploading || saving}
-                  disabledReason={!account.ready ? 'Sign in to your Landwise account to refine a draft.' : staleResult ? 'Your inputs changed. Tailor again to update this draft before requesting revisions.' : inputUploading ? 'Wait for your PDF to finish loading.' : analyzing ? 'Wait for the resume analysis to finish.' : saving ? 'Saving your current draft…' : !aiReady ? 'Connect your ChatGPT account and choose a model to refine this draft.' : ''}
+                  disabled={staleResult || (hosted ? !followUpAccess.allowed && !retryHostedRevision : !aiReady) || analyzing || inputUploading || saving}
+                  requestAllowed={!hosted || followUpAccess.allowed}
+                  retryAllowed={retryHostedRevision}
+                  retryInstruction={retryRevisionInstruction}
+                  disabledReason={hosted && retryHostedRevision ? 'Keep your request unchanged to check for its earlier result without using another AI action.' : hosted && !followUpAccess.allowed ? followUpAccess.message : !account.ready ? 'Sign in to your Landwise account to refine a draft.' : staleResult ? 'Your inputs changed. Tailor again to update this draft before requesting revisions.' : inputUploading ? 'Wait for your PDF to finish loading.' : analyzing ? 'Wait for the resume analysis to finish.' : saving ? 'Saving your current draft…' : !aiReady ? 'Connect your ChatGPT account and choose a model to refine this draft.' : ''}
                   retryIn={cooldown.retryIn} error={revisionError} progress={revisionProgress}
                   onCancel={() => revisionRequestRef.current?.abort()}
                 />}
+                {hosted && result && !account.user && !showAccount && page !== 'applications' && <div className="hosted-signup-after-result"><LandwiseAccount account={account} hosted afterDraft onSignIn={beginSignIn} /></div>}
               </OutputPanel>
             </div>
           </div>
         </section>
         <section className="app-page" ref={applicationsPageRef} tabIndex={-1} hidden={page !== 'applications'} aria-label="My applications">
           {account.ready ? <Applications key={account.workspaceKey} storage={account.cloud ? 'supabase' : 'local'} authorizeHeaders={account.authorizeHeaders} active={page === 'applications'} selectedId={applicationId} csrfToken={connection.session?.csrfToken} revision={result?.savedApplication?.versionId} onRestore={restoreApplication} onNotify={showToast} />
-            : <div className="application-card application-empty"><h1>My applications</h1><p>Sign in to Landwise above to open your own application library.</p></div>}
+            : <div className="application-card application-empty"><h1>My applications</h1><p>{hosted && !account.signInEnabled ? 'Account sign-in is being connected. You can still use your first tailoring and download it.' : 'Sign in to Landwise above to open your own application library.'}</p></div>}
         </section>
         <section className="app-page" ref={eventsPageRef} tabIndex={-1} hidden={page !== 'events'} aria-label="Career events">
           <CareerEvents active={page === 'events'} onNotify={showToast} />
