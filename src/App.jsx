@@ -496,7 +496,7 @@ function Workspace({ account, connection, hosted = false, guestDraft, onPrepareG
         </section>
         <section className="app-page" ref={applicationsPageRef} tabIndex={-1} hidden={page !== 'applications'} aria-label="My applications">
           {account.ready ? <Applications key={account.workspaceKey} storage={account.cloud ? 'supabase' : 'local'} authorizeHeaders={account.authorizeHeaders} active={page === 'applications'} selectedId={applicationId} csrfToken={connection.session?.csrfToken} revision={result?.savedApplication?.versionId} onRestore={restoreApplication} onNotify={showToast} />
-            : <div className="application-card application-empty"><h1>My applications</h1><p>{hosted && !account.signInEnabled ? 'Account sign-in is being connected. You can still use your first tailoring and download it.' : 'Sign in to Landwise above to open your own application library.'}</p></div>}
+            : <div className="application-card application-empty"><h1>My applications</h1><p>{hosted && !account.signInEnabled ? 'Account sign-in is being connected. Download any completed drafts to keep a copy.' : 'Sign in to Landwise above to open your own application library.'}</p></div>}
         </section>
         <section className="app-page" ref={eventsPageRef} tabIndex={-1} hidden={page !== 'events'} aria-label="Career events">
           <CareerEvents active={page === 'events'} onNotify={showToast} />

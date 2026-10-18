@@ -60,7 +60,7 @@ export default function useLandwiseAccount({ allowGuest = false } = {}) {
   const retry = useCallback(() => { setLoading(true); setConfigError(''); setError(''); setAttempt(value => value + 1); }, []);
   const signInEnabled = canStartLandwiseSignIn(config, allowGuest);
   const signIn = useCallback(async email => {
-    if (!signInEnabled) { setError('Account sign-in is being connected. You can still use your first tailoring and download it.'); return false; }
+    if (!signInEnabled) { setError('Account sign-in is being connected. Download any completed drafts to keep a copy.'); return false; }
     if (!client || operationRef.current) return false;
     operationRef.current = true; setBusy(true); setError(''); setNotice('');
     try {
