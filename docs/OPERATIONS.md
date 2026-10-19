@@ -7,7 +7,7 @@ The detailed configuration and caps are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 | System | Owner responsibility |
 | --- | --- |
-| GitHub `stanqiu111/landwise` | Review changes, pass validation, protect access and source history |
+| GitHub `stanqiu111/landwise-resume-career` | Review changes, pass validation, protect access and source history |
 | Vercel project | Hosting, deployment status, runtime logs, environment variables and domains |
 | Supabase project | Database availability, email/auth configuration, backups and per-user data |
 | Dedicated OpenAI API project | Credits, hard spend limit, key access/expiry, model access and usage review |

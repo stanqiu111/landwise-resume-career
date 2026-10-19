@@ -9,7 +9,7 @@ use [OPERATIONS.md](OPERATIONS.md).
 | --- | --- |
 | Public URL | https://landwise-nu.vercel.app |
 | Vercel project | `landwise`, Hobby |
-| Source / production branch | `stanqiu111/landwise` / `main` |
+| Source / production branch | `stanqiu111/landwise-resume-career` / `main` |
 | Node runtime | 24.x |
 | Install | `npm ci` |
 | Production build | `npm run verify:hosted` |
