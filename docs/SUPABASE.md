@@ -1,16 +1,15 @@
 # Landwise accounts, storage and hosted API ledger
 
-Updated October 19, 2026. The selected project is the Personal / Free project
-`supabase-amber-pebble` (`audfewrmqgsefeutappd`). The public URL is
+Updated October 19, 2026. The deployment uses a Supabase Free project.
+The public URL is
 **https://landwise-nu.vercel.app**.
 
 All three migrations, including the hosted AI ledger, are applied remotely.
 **Guest hosted AI is active** after a live synthetic Transform, committed-cost
 replay, exhausted-trial checks and a protected concurrent-reservation test.
 Both runtime credentials are stored as Vercel Production Secrets; the existing
-`Supabase_Key` name is recognized server-side. The owner confirmed the US$5
-provider hard limit and auto-reload OFF on October 19; dashboard settings were
-not independently observed. The application separately enforces US$4/month.
+`Supabase_Key` name is recognized server-side. Operators must verify provider
+spending controls separately; the application enforces its own US$4/month gate.
 Custom SMTP was OFF at the October 17 check; public email delivery is unverified.
 Keep public account sign-in disabled until its authentication flow is ready.
 See [deployment settings](./DEPLOYMENT.md) and the [operations guide](./OPERATIONS.md).
@@ -108,9 +107,9 @@ allowance. A successful result still counts if saving its application fails.
 The provider adapter permits at most four calls/job, 60,000 UTF-8 bytes/request,
 12,000 output tokens/call and 60 seconds/call. Work has a 240-second route budget
 inside the 300-second function limit, with remaining time reserved for save and
-settlement. The adapter has no automatic provider retry. The owner confirmed auto-reload
-OFF and a US$5 provider hard limit on October 19; those dashboard settings
-have not been independently verified. An alert-only budget is insufficient.
+settlement. The adapter has no automatic provider retry. Verify auto-reload is
+OFF and a provider hard spending stop is enabled before activation.
+An alert-only budget is insufficient.
 Keep the separate US$4 application gate and recheck billing controls before
 reactivation or model/budget changes. See the [operations guide](OPERATIONS.md).
 
@@ -138,7 +137,7 @@ settle successfully but cannot be recovered from this cache.
 PDF parsing accepts one file up to 2 MiB, 1–20 pages and 30,000 extracted
 characters, in a credential-free worker with a 10-second deadline and at most
 one worker per process. Heap and best-effort RSS limits are documented in
-[deployment limits](./DEPLOYMENT.md#hosted-pilot-architecture-and-limits).
+[deployment limits](./DEPLOYMENT.md#hosted-limits).
 Upload admission allows 100 attempts/day globally, 10/IP/day and
 10/guest/day. These counters use UTC, retain the current and previous two days
 on subsequent upload admission, and contain no uploaded content. They do not

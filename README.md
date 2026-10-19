@@ -2,8 +2,10 @@
 
 **Your resume. A better fit.**
 
-Landwise helps students tailor a resume using their real experience, understand
-job requirements, and find career events in Canada and the United States.
+Landwise is an **AI resume tailoring and job-search app for students**. Improve
+your resume for a job using your real experience, understand skill gaps with a
+fit report, and find career fairs and job opportunities in Canada and the
+United States.
 
 **Live site: https://landwise-nu.vercel.app**
 
@@ -15,6 +17,7 @@ setup and testing.
 
 | You want to… | Read |
 | --- | --- |
+| Protect API keys and prepare the repository for public release | [Security guide](SECURITY.md) |
 | Maintain the live site, control costs, or recover from an outage | [Operations guide](docs/OPERATIONS.md) |
 | Check production settings, limits, and deployment status | [Deployment reference](docs/DEPLOYMENT.md) |
 | Run the local ChatGPT-connected studio | [Local development](docs/LOCAL_DEVELOPMENT.md) |
@@ -71,9 +74,9 @@ US$0.06 before making provider calls. A guest gets one successful Transform per
 signed browser-cookie identity, not per proven human. Clearing cookies or using
 another browser can create another identity; the shared limits still apply.
 
-The owner confirmed a separate OpenAI US$5 monthly hard limit and auto-reload
-OFF on October 19; those dashboard settings have not been independently
-verified. Keep the app's lower gate and review both usage records. Failed calls
+Operators must separately verify a provider spending stop and keep auto-reload
+OFF. The application gate does not configure the provider's billing settings.
+Keep the app's lower gate and review both usage records. Failed calls
 may cost money. Hard-limit enforcement can slightly overshoot while it
 propagates. [OpenAI spend limits](https://developers.openai.com/api/docs/guides/spend-limits)
 
@@ -89,6 +92,7 @@ The package also supports Node 22.12+; dependencies are locked in
 
 ```sh
 npm ci
+npm run security:setup
 npm run dev
 ```
 
@@ -99,7 +103,9 @@ local workflow. See [local setup and credentials](docs/LOCAL_DEVELOPMENT.md).
 
 | Command | Purpose |
 | --- | --- |
-| `npm run check` | Lint, all automated tests, hosted artifact checks, and local build |
+| `npm run check` | Secret scan, lint, all automated tests, hosted artifact checks, and local build |
+| `npm run security:setup` | Install commit/push secret guards in this clone |
+| `npm run security:history` | Scan all locally available Git history for secrets |
 | `npm run verify:hosted` | The checks Vercel must pass before a new production deployment |
 | `npm run build:hosted` | Hosted browser bundle in `dist-hosted`; checks for private credential references |
 | `npm run build` | Local studio browser bundle in `dist` |
@@ -137,7 +143,8 @@ src/
   resume*.js                 Preview structure and PDF/DOCX pagination/export
   data/careerEvents.js        Curated source-linked event directory
 supabase/migrations/           Immutable, already-applied database history
-scripts/                      Build, cleanup and live-check commands
+scripts/                      Security, build, cleanup and live-check commands
+.githooks/                    Local commit and push guards (enable with security:setup)
 tests/                       Synthetic fixtures and automated regression tests
 docs/                         Deployment, operations, local setup and database guides
 ```
@@ -161,6 +168,9 @@ The unused coming-soon preview was retired; there are now only hosted and local
 builds. Generated outputs, `.vercel`, `.env*` except `.env.example`, and
 `node_modules` stay out of Git. Do not put resume samples, logs containing
 personal data, database backups, or account credentials in the repository.
+Private export/credential paths are also blocked by the secret-scan runner.
+See [SECURITY.md](SECURITY.md) for commit protection, history audits, and the
+controls to enable before changing repository visibility.
 Keep migrations even when they contain legacy trial groundwork: they are
 applied database history, not disposable files.
 

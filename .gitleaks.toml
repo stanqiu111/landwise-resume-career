@@ -1,0 +1,16 @@
+title = "Landwise repository secret detection"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-secret-key"
+description = "Supabase server-only secret key"
+regex = '''sb_secret_[A-Za-z0-9_-]{20,}'''
+keywords = ["sb_secret_"]
+
+[[rules]]
+id = "openai-project-key"
+description = "OpenAI project or service-account API key"
+regex = '''sk-(?:proj|svcacct)-[A-Za-z0-9_-]{40,}'''
+keywords = ["sk-proj-", "sk-svcacct-"]

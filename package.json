@@ -2,6 +2,8 @@
   "name": "landwise",
   "private": true,
   "version": "0.0.0",
+  "description": "AI resume tailoring and job-search tools for students, with fit reports and career events in Canada and the United States.",
+  "keywords": ["resume", "job", "job-search", "resume-tailoring", "career", "students", "career-events"],
   "type": "module",
   "engines": {
     "node": ">=22.12.0 <25"
@@ -11,7 +13,10 @@
     "server": "node server.js",
     "build": "vite build",
     "build:hosted": "node scripts/build-hosted.mjs",
-    "verify:hosted": "npm run lint && npm test && npm run build:hosted",
+    "verify:hosted": "npm run security:check && npm run lint && npm test && npm run build:hosted",
+    "security:setup": "node scripts/secret-scan.mjs --setup",
+    "security:check": "node scripts/secret-scan.mjs",
+    "security:history": "node scripts/secret-scan.mjs --history",
     "check": "npm run verify:hosted && npm run build",
     "check:live": "node scripts/check-live.mjs",
     "clean": "node scripts/clean.mjs",

@@ -8,7 +8,7 @@ use [OPERATIONS.md](OPERATIONS.md).
 | Setting | Current value |
 | --- | --- |
 | Public URL | https://landwise-nu.vercel.app |
-| Vercel project | `personal-93a7/landwise`, Hobby |
+| Vercel project | `landwise`, Hobby |
 | Source / production branch | `stanqiu111/landwise` / `main` |
 | Node runtime | 24.x |
 | Install | `npm ci` |
@@ -16,13 +16,13 @@ use [OPERATIONS.md](OPERATIONS.md).
 | Static output | `dist-hosted` |
 | API entrypoint | `api/index.js`; `/api/:path*` rewrite in `vercel.json` |
 | Function duration | Configured maximum 300 seconds |
-| Supabase | Personal / Free, `supabase-amber-pebble` (`audfewrmqgsefeutappd`) |
+| Supabase | Free PostgreSQL project; configured through server environment variables |
 | Guest AI | Enabled; fixed API-funded `gpt-6-luna` |
 | Account onboarding | Disabled; public email delivery not verified |
 
 `vercel.json` is the source-controlled deployment configuration. Vercel must pass
-lint, all tests and the hosted credential-reference scan before replacing the
-live alias. The former static coming-soon build has been removed. `npm run dev`
+the source secret scan, lint, all tests and the hosted credential-reference scan
+before replacing the live alias. The former static coming-soon build has been removed. `npm run dev`
 remains the separate local ChatGPT studio; never deploy `server.js` publicly.
 
 ## Environment variables
@@ -38,7 +38,7 @@ it does not describe the live values.
 | `LANDWISE_HOSTED_AI_ENABLED` | Live value `true`; turn off and redeploy to stop new AI admission |
 | `LANDWISE_ACCOUNT_SIGN_IN_ENABLED` | Live value `false`; enable only after auth delivery and two-user isolation checks |
 | `LANDWISE_SESSION_SECRET` | Stable random server-only secret, at least 32 bytes |
-| `SUPABASE_URL` | `https://audfewrmqgsefeutappd.supabase.co` |
+| `SUPABASE_URL` | Your project URL, `https://<project-ref>.supabase.co` |
 | `SUPABASE_PUBLISHABLE_KEY` | Browser-safe project key; never a secret/service-role key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only ledger credential; canonical name for new setups |
 | `Supabase_Key` | Existing production secret's exact-case compatibility alias, used only when the canonical variable is absent |
@@ -49,11 +49,10 @@ Do not set both without understanding that precedence. No `VITE_*` variable may
 contain a secret. The hosted server never needs local ChatGPT account files.
 The public storage-config response intentionally includes the publishable key.
 
-The selected service uses the owner's API credits, not their ChatGPT plan.
-Owner confirmation on October 19: OpenAI US$5 monthly hard limit enabled and
-auto-reload OFF. No independent dashboard verification is recorded. The app
-separately gates admission at US$4/month. Keep these distinct; failed requests
-can still incur cost and provider enforcement is not instantaneous.
+The hosted service uses operator-funded API credits. Verify a provider spending
+stop and disable auto-reload in the provider dashboard; those settings are not
+configured by this repository. The app separately gates admission at US$4/month.
+Keep these distinct; failed requests can still incur cost and provider enforcement is not instantaneous.
 [Spend-limit behavior](https://developers.openai.com/api/docs/guides/spend-limits)
 
 ## Hosted limits

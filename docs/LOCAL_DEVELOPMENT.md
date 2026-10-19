@@ -10,6 +10,7 @@ Use Node 24 (`nvm use` if nvm is installed), then:
 
 ```sh
 npm ci
+npm run security:setup
 npm run dev
 ```
 
@@ -71,6 +72,8 @@ cancellation preserve current input/previous output in the tab.
 
 ## Builds and checks
 
+Run `npm run security:setup` once per clone to enable commit/push guards.
+See [repository security](../SECURITY.md) before adding fixtures or publishing.
 Run `npm run check` before pushing. `npm run build` creates the local frontend;
 `npm run build:hosted` creates the public frontend. Both are browser bundles,
 not complete standalone servers. Vite preview does not reproduce Vercel API

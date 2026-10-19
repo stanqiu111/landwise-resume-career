@@ -3,6 +3,43 @@
 .env.*
 !.env.example
 
+# Private credentials, user files and operator scratch work
+private/
+secrets/
+backups/
+uploads/
+exports/
+.auth/
+chatgpt.json
+chatgpt.json.*
+.chatgpt-*.tmp
+credentials
+credentials.*
+secret.json
+secrets.json
+.npmrc
+.netrc
+.pypirc
+id_rsa*
+id_ed25519*
+id_ecdsa*
+id_dsa*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.pdf
+*.docx
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.bak
+test-results/
+playwright-report/
+
 # Logs
 logs
 *.log

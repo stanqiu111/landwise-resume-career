@@ -8,8 +8,8 @@ The detailed configuration and caps are in [DEPLOYMENT.md](DEPLOYMENT.md).
 | System | Owner responsibility |
 | --- | --- |
 | GitHub `stanqiu111/landwise` | Review changes, pass validation, protect access and source history |
-| Vercel `personal-93a7/landwise` | Hosting, deployment status, runtime logs, environment variables and domains |
-| Supabase Personal / `supabase-amber-pebble` | Database availability, email/auth configuration, backups and per-user data |
+| Vercel project | Hosting, deployment status, runtime logs, environment variables and domains |
+| Supabase project | Database availability, email/auth configuration, backups and per-user data |
 | Dedicated OpenAI API project | Credits, hard spend limit, key access/expiry, model access and usage review |
 
 The live website keeps running when your laptop is off. Its availability depends
@@ -54,6 +54,7 @@ Use a branch/PR for changes and run:
 
 ```sh
 npm ci
+npm run security:setup
 npm run check
 ```
 
@@ -64,8 +65,8 @@ build below, independently of GitHub Actions. Branch protection is not configure
 by this repository; a future PR-required check would need separate setup.
 
 Pushing/merging `main` triggers Vercel. `vercel.json` runs
-`npm run verify:hosted`: lint, the test suite, then the hosted build and credential
-reference scan. A failure stops that deployment before it replaces the current
+`npm run verify:hosted`: source secret scan, lint, the test suite, then the hosted
+build and credential reference scan. A failure stops that deployment before it replaces the current
 live alias. The local build is additionally checked by `npm run check`.
 Build server dependencies on Vercel/Linux, especially the native PDF parser;
 do not upload a macOS prebuilt function bundle.
@@ -106,9 +107,9 @@ conservatively. A completed request whose response was lost still counts as
 success. Cached recovery lasts up to seven days and may be evicted sooner;
 request IDs in the browser do not survive refresh.
 
-Keep the dedicated provider hard limit enabled and auto-reload OFF. The owner
-confirmed US$5 on October 19; this is not an independently observed dashboard
-setting. OpenAI hard-limit enforcement can slightly overshoot while state
+Keep the dedicated provider hard limit enabled and auto-reload OFF. Verify these
+settings in the provider dashboard; code does not configure or prove them.
+OpenAI hard-limit enforcement can slightly overshoot while state
 propagates, which is why the app has a lower US$4 gate. An alert alone is not a
 spending stop. [OpenAI spend limits](https://developers.openai.com/api/docs/guides/spend-limits)
 
@@ -150,6 +151,8 @@ A Supabase project change also requires updating the `connect-src` host in
 `vercel.json`. Review any key expiry policy before it causes an outage.
 
 ## Before a wider launch
+
+For source publication, also complete [the repository security checklist](../SECURITY.md#before-changing-visibility-to-public).
 
 - **Account access:** finish custom SMTP, production redirects and email-link
   sign-in, then test two-user isolation before enabling
