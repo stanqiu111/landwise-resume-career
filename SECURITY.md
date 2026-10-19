@@ -78,8 +78,8 @@ disclosure. Review `git diff --cached` before committing.
    for fork deployments in Vercel. Never run unreviewed PR code with production
    credentials. Add GitHub CI with a read-only token and pinned action SHAs when
    a connection with workflow-file permission is available.
-5. Choose a license if offering the project as open source. Public visibility
-   by itself is not an open-source license.
+5. Keep the [MIT License](LICENSE) in place. Public visibility by itself does
+   not give anyone the right to reuse the code; the license file does.
 
 No scanner guarantees that a repository is free of every secret or personal
 detail. Publishing also exposes old commit metadata and documents unless

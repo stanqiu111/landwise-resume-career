@@ -14,6 +14,7 @@ students.
 <br>
 
 [![Live site](https://img.shields.io/badge/live-landwise--resume.vercel.app-3b5bdb?style=flat-square&logo=vercel&logoColor=white)](https://landwise-resume.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-f59e0b?style=flat-square)](LICENSE)
 ![No signup](https://img.shields.io/badge/signup-not%20needed-22c55e?style=flat-square)
 ![No API key](https://img.shields.io/badge/API%20key-not%20needed-22c55e?style=flat-square)
 ![PDF and DOCX](https://img.shields.io/badge/export-PDF%20%26%20DOCX-a78bfa?style=flat-square)
@@ -199,5 +200,5 @@ commands, project structure and hosting costs are in the
 
 ## License
 
-There is no license yet, so all rights are reserved. You can read the code and
-fork it on GitHub, but not reuse it elsewhere without permission.
+[MIT](LICENSE). Landwise is free and open source: you can use, change, share
+and sell it, as long as you keep the copyright notice and license text.

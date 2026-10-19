@@ -159,5 +159,5 @@ controls to enable before changing repository visibility.
 Keep migrations even when they contain legacy trial groundwork: they are
 applied database history, not disposable files.
 
-There is no `LICENSE` file yet. Without one, a public repository can be viewed
-but not reused; add a license before distributing it as open source.
+Landwise is released under the [MIT License](../LICENSE). Keep that file and
+its copyright notice in place.
