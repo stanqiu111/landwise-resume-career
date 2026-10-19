@@ -15,7 +15,7 @@ async function inspect(directory) {
       for (const value of ['/api/auth/', 'SUPABASE_SERVICE_ROLE_KEY', 'Supabase_Key', 'OPENAI_API_KEY', 'chatgpt.json']) {
         if (source.includes(value)) throw new Error(`Server credential reference in hosted output: ${filename}`);
       }
-      if (/(?:sb_secret_|sk-proj-)[A-Za-z0-9_-]{20,}/.test(source)) throw new Error(`Secret-shaped value in hosted output: ${filename}`);
+      if (/(?:sb_secret_|sk-(?:proj|svcacct)-)[A-Za-z0-9_-]{20,}/.test(source)) throw new Error(`Secret-shaped value in hosted output: ${filename}`);
     } else throw new Error(`Unexpected hosted build file: ${filename}`);
   }
 }
