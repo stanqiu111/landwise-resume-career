@@ -17,6 +17,7 @@ const textResponse = (text) => completed({ output: [{ type: 'message', status: '
 function fixture(options = {}) {
   const calls = [];
   const events = [];
+  const logs = [];
   const inference = createOpenAIInference({
     apiKey: 'synthetic-server-key',
     fetchImpl: async (url, init) => {
@@ -28,9 +29,10 @@ function fixture(options = {}) {
       events.push({ req, event });
       if (options.onUsage) await options.onUsage(req, event);
     },
+    log: value => logs.push(JSON.parse(value)),
     ...options.dependencies,
   });
-  return { inference, calls, events };
+  return { inference, calls, events, logs };
 }
 
 async function invoke(f, req = {}, overrides = {}) {
@@ -88,7 +90,27 @@ test('JSON text blocks and final answer phases preserve the existing messages.cr
   ] }) });
   const { result } = await invoke(f, {}, { messages: [{ role: 'user', content: [{ type: 'text', text: 'Line one' }, { type: 'text', text: 'Line two' }] }] });
   assert.equal(result.content[0].text, '{"answer":42}');
-  assert.equal(f.calls[0].body.input[0].content, 'Line one\nLine two');
+  assert.match(f.calls[0].body.input[0].content, /^Return one valid JSON object only\./);
+  assert.ok(f.calls[0].body.input[0].content.endsWith('Line one\nLine two'));
+});
+
+test('matching-style input carries its JSON instruction inside input, without relying on top-level instructions', async () => {
+  const matching = { system: 'Match verified facts. Return valid JSON only.',
+    messages: [{ role: 'user', content: 'Return {"matches":[]} using only supplied evidence.' }] };
+  const original = structuredClone(matching);
+  const f = fixture({ fetchImpl: async (_url, init) => {
+    const body = JSON.parse(init.body);
+    if (!body.input.some(item => item.role === 'user' && /JSON/.test(item.content))) {
+      return Response.json({ error: { code: 'invalid_request_error', param: 'input', message: 'Input must mention JSON.' } }, { status: 400 });
+    }
+    return Response.json(completed());
+  } });
+  const { result } = await invoke(f, {}, matching);
+  assert.equal(result.content[0].text, '{"ok":true}');
+  assert.equal(f.calls.length, 1);
+  assert.match(f.calls[0].body.input[0].content, /^Return one valid JSON object only\./);
+  assert.ok(f.calls[0].body.input[0].content.endsWith(matching.messages[0].content));
+  assert.deepEqual(matching, original, 'the caller\'s transcript remains untouched');
 });
 
 test('the whole serialized UTF-8 request is bounded before any billable request', async () => {
@@ -190,6 +212,45 @@ test('HTTP provider errors never retry, leak provider messages, or settle sent w
     const total = f.inference.getUsage(req);
     assert.equal(total.costMicroUsd, HOSTED_AI_CALL_RESERVATION_MICRO_USD);
     assert.equal(total.estimated, true);
+  }
+});
+
+test('provider diagnostics retain useful allowlisted metadata without error bodies or secrets', async () => {
+  const requestId = '11111111-2222-4333-8444-555555555555';
+  const providerRequestId = 'req_0123456789abcdef0123456789abcdef';
+  const f = fixture({ fetchImpl: async () => Response.json({ error: {
+    message: 'private resume synthetic-server-key', code: 'unsupported_parameter', param: 'reasoning.effort',
+    type: 'private-type', extra: 'private-body',
+  } }, { status: 400, headers: { 'x-request-id': providerRequestId, 'x-private-header': 'private-header' } }) });
+  const req = { headers: { 'x-request-id': requestId, authorization: 'Bearer private-bearer' } };
+  await assert.rejects(invoke(f, req), { code: 'hosted_ai_request_failed' });
+  assert.deepEqual(f.logs, [{ event: 'hosted_provider_error', model: 'gpt-6-luna', callIndex: 1,
+    errorName: 'BadRequestError', status: 400, providerCode: 'unsupported_parameter', param: 'reasoning.effort',
+    providerRequestId, requestId }]);
+  assert.doesNotMatch(JSON.stringify(f.logs), /private|synthetic-server-key|Return a JSON|careful resume/);
+  assert.equal(f.inference.getUsage(req).costMicroUsd, HOSTED_AI_CALL_RESERVATION_MICRO_USD);
+});
+
+test('unrecognized provider diagnostic fields are omitted even when they resemble identifiers', async () => {
+  const f = fixture({ fetchImpl: async () => Response.json({ error: {
+    message: 'secret_resume', code: 'secret_resume', param: 'input[0].secret_resume', type: 'secret_resume',
+  } }, { status: 400, headers: { 'x-request-id': 'req_secret_resume' } }) });
+  await assert.rejects(invoke(f, { headers: { 'x-request-id': 'secret_resume' } }), { code: 'hosted_ai_request_failed' });
+  assert.deepEqual(f.logs, [{ event: 'hosted_provider_error', model: 'gpt-6-luna', callIndex: 1,
+    errorName: 'BadRequestError', status: 400, providerCode: null, param: null }]);
+  assert.doesNotMatch(JSON.stringify(f.logs), /secret_resume/);
+});
+
+test('diagnostic logger failure cannot change usage, retry behavior or the sanitized client error', async () => {
+  for (const log of [() => { throw new Error('private-log-failure'); }, async () => { throw new Error('private-log-failure'); }]) {
+    const f = fixture({ dependencies: { log }, fetchImpl: async () => Response.json({ error: {
+      message: 'private provider error', code: 'model_not_found', param: 'model',
+    } }, { status: 404 }) });
+    const req = {};
+    await assert.rejects(invoke(f, req), { code: 'hosted_ai_request_failed', status: 502 });
+    assert.equal(f.calls.length, 1);
+    assert.equal(f.inference.getUsage(req).costMicroUsd, HOSTED_AI_CALL_RESERVATION_MICRO_USD);
+    assert.equal(f.events.length, 1);
   }
 });
 

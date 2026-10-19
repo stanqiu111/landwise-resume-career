@@ -8,23 +8,23 @@ Current URL: **https://landwise-nu.vercel.app**. Vercel project
 `personal-93a7/landwise` is on Hobby, connected to `stanqiu111/landwise`, production
 branch `main`.
 
-The hosted studio and API are deployed. **Public AI and public account sign-in
-remain disabled** until their activation checks are complete. On October 19,
-protected staged production deployment `dpl_4J6hZarctprihC2yNFrqCn2rhhnA`
-reached Ready and successfully checked the Supabase budget service. It was
-created with `--skip-domain` and has not been promoted. No paid provider call
-was made.
+**Guest resume tailoring is live. Public account sign-in remains disabled.**
+On October 19, protected staged deployment
+`dpl_FZPywr9biHpuHJvBLdpKk9ALRaEQ` passed a real synthetic Transform and its
+replay/allowance checks, then was promoted to the public domain. The production
+AI flag is true; the account sign-in flag stays false. Subsequent Git deployments
+inherit these flags.
 
 | Item | Verified state |
 | --- | --- |
 | Hosted studio and career events | Deployed at the URL above |
-| Hosted API and guest identity | Live configuration and secure cookie verified; AI disabled |
-| Shared spending ledger | Applied; automated tests and live permission checks pass |
+| Hosted API and guest identity | Guest AI enabled; live configuration and secure cookie verified |
+| Shared spending ledger | Live reservation contention, settlement, replay and allowance checks pass |
 | Foundation and application storage-limit migrations | Applied to the selected Supabase project |
 | AI budget migration, `202610170002_landwise_ai_budget.sql` (migration003) | Applied remotely; permissions/counts verified |
-| Hosted OpenAI API key | Saved as Production Secret `OPENAI_API_KEY`; provider access not yet tested |
+| Hosted OpenAI API key | Production Secret `OPENAI_API_KEY`; three-call live Transform succeeded |
 | Hosted Supabase service-role key | Saved as Production Secret `Supabase_Key`; protected runtime budget-status RPC succeeded |
-| Provider-side US$5 spending stop | Not verified; required before activation |
+| Provider-side US$5 spending stop | Owner confirmed hard limit enabled and auto-reload OFF on October 19; no independent dashboard verification |
 | Public account email delivery | Custom SMTP was OFF at the October 17 check; delivery is not verified |
 | Public account sign-in | Keep `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` |
 
@@ -34,24 +34,44 @@ Vercel function limit. `npm run build:public` still produces the separate static
 `npm run dev` and `npm run build` retain the local studio. Local ChatGPT account
 files and account-picker routes are excluded from the hosted runtime.
 
-Eight hosted environment settings are saved in Vercel, including both private
-provider/service credentials. `Supabase_Key` uses the server-only compatibility
-alias described below. The staged deployment overrides the AI flag to true
-behind Vercel authentication; the public deployment still returns
-`configured:false`. Secret values were not downloaded or printed.
+Both private credentials remain in Vercel as Production Secrets. `Supabase_Key`
+uses the server-only compatibility alias described below; values were never
+downloaded or printed. Provider pricing was rechecked against official OpenAI
+documentation on October 19. Dashboard access was unavailable, so the provider
+hard-limit and auto-reload settings are owner-confirmed rather than independently
+observed. Application limits below are enforced independently in PostgreSQL.
 
-October 19 checks: unauthenticated staged access redirects to Vercel sign-in.
-An authenticated CLI request to its `/api/session` returned HTTP 200 with
-`available:true`, `guestEligible:true`, `remaining:1` and a CSRF token. This
-validates the runtime Supabase key and ledger access, but does not validate the
-OpenAI key, paid inference, settlement or provider billing controls. Browser
-access was unavailable, so those billing settings remain unverified.
+The first live test completed extraction but its matching request was rejected.
+Its failed reservation settled and preserved the guest allowance. Adding the
+explicit JSON instruction to actual input messages resolved the matching-style
+regression and the second live test. The original provider error detail was not
+available, so input-only JSON validation remains the likely, not proven, cause.
 
-Earlier October 17 live checks: `/api/health`, `/api/storage/config` and `/api/session` returned JSON
-200 with `Cache-Control: no-store`. Session availability is false with reason
-`configuration`, and its cookie is Secure/HttpOnly. The public config contains
-only Supabase's publishable key and settings. `/api/auth/session`, `/.env` and
-`/server.js` return 404. The live browser showed no console errors.
+The successful synthetic one-page resume finished in 27 seconds, preserved both
+experiences and their purposes, made one small bullet edit, and returned an 88
+evidence-match score. Unsupported Kubernetes experience stayed out of the resume
+and appeared in the learning report. The ledger settled 1,754 microUSD
+(US$0.001754); an identical request returned the exact cached result and the same
+charge with no processing steps. Changed input with the same ID returned 409;
+a new ID for the used guest returned 429. The used guest had zero remaining
+trials; a fresh guest was available, confirming the global reservation cleared.
+The earlier failed job conservatively settled 14,150 microUSD, including its
+uncertain rejected call. These are application ledger amounts, not a billing
+dashboard reconciliation.
+
+A temporary protected harness raced two distinct reservation RPCs while holding
+the winner: exactly one was admitted and the other returned `hosted_ai_busy`.
+Its guard and winner both settled failed at known cost zero, with no provider
+calls. Repeating the harness skipped the race. Attempt counters were preserved.
+This exercised real concurrent RPC admission, not every possible database
+schedule. The temporary deployment was removed and was never published.
+
+Public API checks return JSON with `Cache-Control: no-store`; health is
+`configured:true`, fresh guest availability is true, and the cookie is
+Secure/HttpOnly. Public configuration includes only the publishable Supabase
+settings and `signInEnabled:false`. Owner auth and temporary probe routes are
+absent. Browser visual checks were unavailable on October 19; prior October 17
+browser QA showed no console errors.
 
 ## Hosted pilot architecture and limits
 
@@ -172,9 +192,10 @@ jobs were created by the migration checks. The project remains on Free.
    provider billing ceiling. Recheck model prices and reservation math before
    activation or any model change.
 2. All three migrations are already applied. Preserve their recorded hashes
-   and role restrictions; do not rerun them. Run a separate-session contention
-   check against staging before activation. Permission/count verification does
-   not replace that check.
+   and role restrictions; do not rerun them. The October 19 protected harness
+   verified concurrent admission through real RPC requests. Repeat equivalent
+   bounded staging checks if changing ledger admission behavior; permission/count
+   verification alone does not replace contention testing.
 3. Configure server-only environment variables from [.env.example](../.env.example):
    `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LANDWISE_SESSION_SECRET`, exact
    `LANDWISE_APP_ORIGIN`, `SUPABASE_URL` and the separate
@@ -225,12 +246,13 @@ idempotency, costs, guest identity, API requests, provider failure handling and
 UI states. Provider calls in these tests are mocked; they do not verify live
 credentials, billing enforcement, email delivery or multi-session scheduling.
 
-Latest local validation: 345 tests passed, lint passed, all three application
-builds passed, Vercel production build passed, and dependency audit reported
-zero vulnerabilities. Browser QA used simulated AI responses: one-page output,
-fit report, guest entitlement exhaustion, disabled unconfigured sign-in, and a
-390px viewport with no horizontal overflow. No paid provider request was made.
-Live anonymous probes of all five budget/upload RPCs returned 401 / 42501.
+October 19 validation: 359 tests passed, lint passed, and the Vercel/Linux hosted
+build passed. Live provider, ledger and replay results are recorded above.
+October 17 validation also covered all three application builds and an audit
+with zero vulnerabilities. That browser QA used simulated AI responses: one-page
+output, fit report, exhausted guest trial, unavailable account sign-in, and a
+390px viewport with no horizontal overflow. Anonymous probes of all five
+budget/upload RPCs returned 401 / 42501.
 
 ```sh
 npm run lint

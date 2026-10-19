@@ -67,6 +67,19 @@ export function createHostedApp({ security, budget, inference, cloudStorage, ena
     next();
   });
   const ready = () => Boolean(enabled && security && budget && inference && cloudStorage);
+  function logReceipt(event, receipt, requestId) {
+    const safeCost = value => Number.isSafeInteger(value) && value >= 0 && value <= 100000000;
+    try {
+      Promise.resolve(log(JSON.stringify({
+        event,
+        ...(typeof requestId === 'string' && UUID.test(requestId) ? { requestId } : {}),
+        ...(typeof receipt?.jobId === 'string' && UUID.test(receipt.jobId) ? { jobId: receipt.jobId } : {}),
+        status: ['reserved', 'completed', 'failed'].includes(receipt?.status) ? receipt.status : 'unknown',
+        ...(safeCost(receipt?.reservedCostMicrousd) ? { reservedCostMicrousd: receipt.reservedCostMicrousd } : {}),
+        ...(safeCost(receipt?.chargedCostMicrousd) ? { chargedCostMicrousd: receipt.chargedCostMicrousd } : {}),
+      }))).catch(() => {});
+    } catch { /* Logging must not change settlement or expose receipt contents. */ }
+  }
   app.get('/api/health', (_req, res) => res.json({ mode: 'hosted', configured: ready() }));
   app.get('/api/storage/config', (_req, res) => res.json({ ...(cloudStorage?.publicConfig || { storage: 'unavailable' }), mode: 'hosted', signInEnabled }));
   app.get('/api/session', async (req, res) => {
@@ -133,6 +146,7 @@ export function createHostedApp({ security, budget, inference, cloudStorage, ena
           inputHash: createHash('sha256').update(JSON.stringify({ operation, input })).digest('hex'), maxCostMicrousd: HOSTED_AI_JOB_RESERVATION_MICRO_USD });
         progress = operation === 'analyze' ? null : transformProgress(req, res, log);
         if (!receipt.admitted) {
+          logReceipt('hosted_ai_replayed', receipt, requestId);
           if (receipt.status === 'completed' && receipt.result) return progress ? progress.complete(receipt.result) : res.json(receipt.result);
           throw fail(409, receipt.status === 'reserved' ? 'hosted_ai_busy' : 'hosted_result_unavailable', receipt.status === 'reserved'
             ? 'This request is still running or awaiting recovery. Try the same request again later.'
@@ -156,15 +170,19 @@ export function createHostedApp({ security, budget, inference, cloudStorage, ena
         }
         // Record entitlement, cost and recovery output BEFORE sending a success.
         // Settlement has its own timeout, independent of a disconnected browser.
-        await budget.complete({ jobId: receipt.jobId, actualCostMicrousd: inference.getUsage(req)?.costMicroUsd ?? null, result });
+        const settlement = await budget.complete({ jobId: receipt.jobId, actualCostMicrousd: inference.getUsage(req)?.costMicroUsd ?? null, result });
         settled = true;
+        logReceipt('hosted_ai_settled', settlement, requestId);
         progress ? progress.complete(result) : res.json(result);
       } catch (error) {
         if (!receipt && reservationRequestId && error?.code === 'hosted_budget_unavailable') {
           log(JSON.stringify({ event: 'hosted_reservation_unconfirmed', requestId: reservationRequestId }));
         }
         if (receipt?.admitted && !settled) {
-          try { await budget.fail({ jobId: receipt.jobId, actualCostMicrousd: inference.getUsage(req)?.costMicroUsd ?? null }); }
+          try {
+            const settlement = await budget.fail({ jobId: receipt.jobId, actualCostMicrousd: inference.getUsage(req)?.costMicroUsd ?? null });
+            logReceipt('hosted_ai_settled', settlement, reservationRequestId);
+          }
           catch { log(JSON.stringify({ event: 'hosted_settlement_pending', jobId: receipt.jobId })); }
         }
         progress ? progress.fail(error) : sendError(res, error);

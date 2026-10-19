@@ -1,14 +1,17 @@
 # Landwise accounts, storage and hosted API ledger
 
-Updated October 17, 2026. The selected project is the Personal / Free project
+Updated October 19, 2026. The selected project is the Personal / Free project
 `supabase-amber-pebble` (`audfewrmqgsefeutappd`). The public URL is
 **https://landwise-nu.vercel.app**.
 
 All three migrations, including the hosted AI ledger, are applied remotely.
-The hosted API runtime is **locally tested but not activated**. No hosted
-OpenAI API key or service-role runtime key is configured, and an enforceable
-US$5 provider spending stop has not been verified.
-Custom SMTP is OFF, and public account email delivery has not been verified.
+**Guest hosted AI is active** after a live synthetic Transform, committed-cost
+replay, exhausted-trial checks and a protected concurrent-reservation test.
+Both runtime credentials are stored as Vercel Production Secrets; the existing
+`Supabase_Key` name is recognized server-side. The owner confirmed the US$5
+provider hard limit and auto-reload OFF on October 19; dashboard settings were
+not independently observed. The application separately enforces US$4/month.
+Custom SMTP was OFF at the October 17 check; public email delivery is unverified.
 Keep public account sign-in disabled until its authentication flow is ready.
 See [deployment status](./DEPLOYMENT.md) for the live/source distinction.
 

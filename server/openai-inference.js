@@ -25,6 +25,46 @@ export const HOSTED_AI_JOB_RESERVATION_MICRO_USD = 60000;
 const API_BASE = 'https://api.openai.com/v1';
 const JSON_INSTRUCTION = 'Return one valid JSON object only. Do not include Markdown fences or text outside the JSON object.';
 const MAX_MESSAGES = 16;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const PROVIDER_CODES = new Set([
+  'invalid_request_error', 'invalid_api_key', 'invalid_value', 'invalid_type', 'invalid_parameter',
+  'unsupported_parameter', 'unsupported_value', 'unsupported_model', 'model_not_found', 'model_access_denied',
+  'context_length_exceeded', 'insufficient_quota', 'rate_limit_exceeded', 'slow_down',
+  'credit_balance_exhausted', 'organization_spend_limit_exceeded', 'project_spend_limit_exceeded',
+  'organization_usage_limit_exceeded', 'billing_hard_limit_reached', 'permission_denied',
+  'organization_deactivated', 'account_deactivated', 'server_error', 'server_is_overloaded',
+  'service_unavailable', 'invalid_json_schema', 'content_policy_violation', 'invalid_prompt',
+]);
+const PROVIDER_PARAMS = new Set([
+  'model', 'input', 'instructions', 'reasoning', 'reasoning.effort', 'reasoning_effort',
+  'text', 'text.format', 'text.format.type', 'response_format', 'max_output_tokens',
+  'max_tokens', 'temperature', 'top_p', 'store', 'stream', 'service_tier', 'truncation',
+]);
+const ERROR_NAMES = new Set([
+  'Error', 'TypeError', 'AbortError', 'APIError', 'APIConnectionError', 'APIConnectionTimeoutError',
+  'APIUserAbortError', 'BadRequestError', 'AuthenticationError', 'PermissionDeniedError',
+  'NotFoundError', 'ConflictError', 'UnprocessableEntityError', 'RateLimitError', 'InternalServerError',
+]);
+
+function providerErrorMetadata(error, req, callIndex) {
+  // SDK APIError subclasses inherit name="Error". Normalize only known class
+  // names; never serialize the error, message, stack, cause, body or headers.
+  const className = error?.constructor?.name;
+  const errorName = ERROR_NAMES.has(className) ? className : ERROR_NAMES.has(error?.name) ? error.name : 'UnknownError';
+  const param = error?.param;
+  const safeParam = PROVIDER_PARAMS.has(param) || (typeof param === 'string' && param.length <= 64
+    && /^input\[\d{1,2}\](?:\.(?:role|content)(?:\[\d{1,2}\](?:\.(?:type|text))?)?)?$/.test(param));
+  const providerRequestId = error?.requestID;
+  const requestId = req.headers?.['x-request-id'];
+  return {
+    event: 'hosted_provider_error', model: HOSTED_AI_MODEL, callIndex, errorName,
+    status: Number.isInteger(error?.status) && error.status >= 400 && error.status <= 599 ? error.status : null,
+    providerCode: PROVIDER_CODES.has(error?.code) ? error.code : null,
+    param: safeParam ? param : null,
+    ...(typeof providerRequestId === 'string' && /^req_[a-f0-9]{16,128}$/i.test(providerRequestId) ? { providerRequestId } : {}),
+    ...(typeof requestId === 'string' && UUID.test(requestId) ? { requestId } : {}),
+  };
+}
 
 export class OpenAIInferenceError extends Error {
   constructor(message, status, code) {
@@ -75,6 +115,12 @@ function requestBody({ system, messages } = {}) {
     }
     return { role: message.role, content };
   });
+  // JSON mode requires an explicit instruction in the conversation. Include
+  // it in actual input as well as instructions, even when the caller's user
+  // prompt only describes an object shape without the literal JSON marker.
+  const userMessage = input.find((message) => message.role === 'user');
+  if (userMessage) userMessage.content = `${JSON_INSTRUCTION}\n\n${userMessage.content}`;
+  else input.push({ role: 'user', content: JSON_INSTRUCTION });
   const body = {
     model: HOSTED_AI_MODEL,
     instructions: system ? `${system}\n\n${JSON_INSTRUCTION}` : JSON_INSTRUCTION,
@@ -164,11 +210,12 @@ export function createOpenAIInference({
   apiKey,
   fetchImpl = globalThis.fetch,
   onUsage,
+  log = console.info,
   responseTimeoutMs = HOSTED_AI_LIMITS.responseTimeoutMs,
   jobTimeoutMs = HOSTED_AI_LIMITS.jobTimeoutMs,
   now = () => performance.now(),
 } = {}) {
-  if (typeof fetchImpl !== 'function' || (onUsage !== undefined && typeof onUsage !== 'function')) throw new TypeError('Invalid inference dependencies.');
+  if (typeof fetchImpl !== 'function' || typeof log !== 'function' || (onUsage !== undefined && typeof onUsage !== 'function')) throw new TypeError('Invalid inference dependencies.');
   if (!Number.isInteger(responseTimeoutMs) || responseTimeoutMs < 1 || responseTimeoutMs > HOSTED_AI_LIMITS.responseTimeoutMs
     || !Number.isInteger(jobTimeoutMs) || jobTimeoutMs < 1 || jobTimeoutMs > HOSTED_AI_LIMITS.jobTimeoutMs) {
     throw new TypeError('Inference deadlines must be within the server limits.');
@@ -233,6 +280,11 @@ export function createOpenAIInference({
               return { content: [{ type: 'text', text: resultText(response) }], stop_reason: 'end_turn' };
             });
           } catch (error) {
+            if (sent && !(error instanceof OpenAIInferenceError)) {
+              try {
+                Promise.resolve(log(JSON.stringify(providerErrorMetadata(error, req, callIndex)))).catch(() => {});
+              } catch { /* Diagnostic failures never alter billing or user errors. */ }
+            }
             failure = req.aiSignal?.aborted ? cancelled() : providerError(error);
           }
           try {

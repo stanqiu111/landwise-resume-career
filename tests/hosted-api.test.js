@@ -32,14 +32,14 @@ async function harness(t, options = {}) {
       events.push('reserve');
       const previous = jobs.get(input.requestId);
       if (previous) return { ...previous, admitted: false };
-      const receipt = { jobId: randomUUID(), status: 'reserved', admitted: true, input };
+      const receipt = { jobId: randomUUID(), status: 'reserved', admitted: true, reservedCostMicrousd: 60000, input };
       jobs.set(input.requestId, receipt);
       return receipt;
     },
     complete: async input => {
       events.push('complete');
       const job = [...jobs.values()].find(job => job.jobId === input.jobId);
-      Object.assign(job, { status: 'completed', result: input.result, actualCostMicrousd: input.actualCostMicrousd });
+      Object.assign(job, { status: 'completed', result: input.result, actualCostMicrousd: input.actualCostMicrousd, chargedCostMicrousd: input.actualCostMicrousd });
       return job;
     },
     fail: async input => { events.push(['fail', input.actualCostMicrousd]); },
@@ -72,6 +72,36 @@ test('guest first transform reserves before inference and settles before result;
   assert.deepEqual(await h.post(), first);
   assert.deepEqual(h.events, ['reserve', 'provider', 'complete', 'reserve']);
   assert.equal([...h.jobs.values()][0].actualCostMicrousd, 1234);
+});
+
+test('settlement and replay logs contain committed receipt metadata only', async t => {
+  const logs = [];
+  const h = await harness(t, { app: { log: value => logs.push(JSON.parse(value)) } });
+  assert.equal((await h.post()).status, 200);
+  assert.equal((await h.post()).status, 200);
+  const receipt = [...h.jobs.values()][0];
+  const ledgerLogs = logs.filter(item => item.event.startsWith('hosted_ai_'));
+  const metadata = { requestId: h.headers['X-Request-ID'], jobId: receipt.jobId, status: 'completed',
+    reservedCostMicrousd: 60000, chargedCostMicrousd: 1234 };
+  assert.deepEqual(ledgerLogs, [{ event: 'hosted_ai_settled', ...metadata }, { event: 'hosted_ai_replayed', ...metadata }]);
+  for (const sensitive of [resume, payload.jobDescription, h.headers.Cookie, h.headers['X-CSRF-Token'], receipt.input.guestHash, receipt.input.ipHash]) {
+    assert.ok(!JSON.stringify(logs).includes(sensitive), 'private content and identity hashes are excluded');
+  }
+  assert.deepEqual(h.events, ['reserve', 'provider', 'complete', 'reserve']);
+});
+
+test('failed settlement logs only the charge confirmed by the ledger', async t => {
+  const logs = [];
+  const h = await harness(t, { app: {
+    log: value => logs.push(JSON.parse(value)),
+    transform: async () => { throw new Error('private provider failure'); },
+  }, budget: { fail: async input => ({ jobId: input.jobId, status: 'failed', reservedCostMicrousd: 60000,
+    chargedCostMicrousd: 13625, result: { secret: 'private receipt content' } }) } });
+  assert.equal((await h.post()).status, 502);
+  const entry = logs.find(item => item.event === 'hosted_ai_settled');
+  assert.equal(entry.status, 'failed');
+  assert.equal(entry.chargedCostMicrousd, 13625, 'log the confirmed receipt, not a recomputed estimate');
+  assert.doesNotMatch(JSON.stringify(logs), /private provider|private receipt|secret/);
 });
 
 test('pending replay never starts another provider request', async t => {
