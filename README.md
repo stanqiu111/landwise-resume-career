@@ -1,220 +1,203 @@
+<div align="center">
+
+<img src="public/favicon.svg" alt="Landwise logo" width="88">
+
 # Landwise
 
 **Your resume. A better fit.**
 
-Landwise is an **AI resume tailoring and job-search app for students**. Improve
-your resume for a job using your real experience, understand skill gaps with a
-fit report, and find career fairs and job opportunities in Canada and the
-United States.
+Landwise uses AI to tailor your resume to a job with small edits to the bullet
+points you already wrote. It shows how well you fit and what to learn next,
+and lists hand-picked career fairs in Canada and the United States. Built for
+students.
 
-[![Hosted on Vercel](https://img.shields.io/badge/Hosted%20on-Vercel-000000?logo=vercel&logoColor=white)](https://landwise-nu.vercel.app) **Live site: https://landwise-nu.vercel.app**
+<br>
 
-Status reviewed October 19, 2026: guest AI tailoring is live. Public account
-sign-in and account libraries are not yet enabled; email delivery still needs
-setup and testing.
+[![Live site](https://img.shields.io/badge/live-landwise--nu.vercel.app-3b5bdb?style=flat-square&logo=vercel&logoColor=white)](https://landwise-nu.vercel.app)
+![No signup](https://img.shields.io/badge/signup-not%20needed-22c55e?style=flat-square)
+![No API key](https://img.shields.io/badge/API%20key-not%20needed-22c55e?style=flat-square)
+![PDF and DOCX](https://img.shields.io/badge/export-PDF%20%26%20DOCX-a78bfa?style=flat-square)
+![Career events](https://img.shields.io/badge/career%20events-Canada%20%26%20US-f472b6?style=flat-square)
+![React 19](https://img.shields.io/badge/React-19-38bdf8?style=flat-square&logo=react&logoColor=white)
 
-## Why Landwise
+<br>
 
-- **The AI edits bullets; it can't rewrite your resume.** The model returns
-  edits to existing bullet lines, and server code applies them to your original
-  text. Lines without a bullet marker, such as your name, contact details,
-  headings, and role and date lines, are copied unchanged, and no line is
-  added, removed or reordered. At most 35% of bullets change per run (rounded
-  up, minimum one). A draft that breaks any rule is rejected whole, never
-  partly applied.
-- **Evidence comes from your own words.** A fact counts as evidence only if its
-  quote is found in your original resume. Anything else, including wording
-  that appears only in the job description, is discarded in code, and
-  requirements with no verified evidence are listed as gaps to work on.
-- **Your numbers stay yours.** Each edited bullet must keep the same numbers it
-  started with, and a draft containing any number that isn't in your original
-  resume is rejected.
-- **The page count is real.** The app and the PDF download use the same layout
-  code, so the page count you see is the PDF's page count. Text never goes
-  below 10.5 pt: a draft that can't fit your page limit gets an error, not
-  smaller text or cut lines. Word files can reflow after you edit them.
-- **A score rewording can't inflate.** The match score is calculated by code
-  from verified evidence, not written by the model, so rewording bullets can't
-  raise it. The report calls it an estimate, not an ATS score.
-- **Free to try, nothing to set up.** On the live site, your first tailoring
-  needs no account, email or API key, and a failed or cancelled run doesn't use
-  it up. PDF and DOCX files are built in your browser, with no watermark.
+<img src="docs/images/hero.png" alt="The Landwise resume studio with a tailored draft ready to review and download" width="900">
 
-These checks compare text, not meaning. A short quote can match inside a longer
-word ("Java" inside "JavaScript"), and only digits are locked, not their units
-("$1.5M" changed to "$1.5B" would pass). Read every draft before you send it.
+### [🌐 Try it at landwise-nu.vercel.app](https://landwise-nu.vercel.app)
 
-## Start here
+One free tailoring per browser: no account, no email, no API key.<br>
+<sub>Screenshots show an invented student and job from a scripted demo run, so
+real timings may differ.</sub>
 
-| You want to… | Read |
-| --- | --- |
-| Protect API keys and prepare the repository for public release | [Security guide](SECURITY.md) |
-| Maintain the live site, control costs, or recover from an outage | [Operations guide](docs/OPERATIONS.md) |
-| Check production settings, limits, and deployment status | [Deployment reference](docs/DEPLOYMENT.md) |
-| Run the local ChatGPT-connected studio | [Local development](docs/LOCAL_DEVELOPMENT.md) |
-| Understand ownership, migrations, and interrupted AI jobs | [Supabase guide](docs/SUPABASE.md) |
-| Change the pipeline or UI | [Architecture](ARCHITECTURE.md) and [quality rules](QUALITY.md) |
+</div>
 
-## What works today
+<br>
 
-- **A free first tailoring without signup.** Upload a PDF or paste a resume and
-  job description. The server pays for OpenAI API usage; the public site does
-  not use your personal ChatGPT subscription or ask visitors for API keys.
-- **A match estimate and fit report.** Separate evidence already in the resume,
-  related experience to expand, and requirements to learn or substantiate.
-  This is not an ATS score or a hiring prediction.
-- **Length-aware PDF and DOCX downloads.** Uploaded PDF pages set the initial
-  limit; pasted text uses an estimate the user can adjust. Oversized output is
-  rejected instead of silently truncated. PDF has fixed pagination; Word can
-  reflow after edits or font substitution.
-- **Visible progress and failure handling.** Read, Match, Build, and Check follow
-  server stages. Inputs and the previous draft stay in the current tab after
-  errors. A confirmed generation failure preserves the success allowance, but
-  attempts and any incurred provider cost still count.
-- **Career-event discovery.** Curated organizer links, eligibility, dates,
-  filters, and optional browser location sorting. Saved event IDs stay in
-  browser local storage. Rounded location stays in memory and is not sent to
-  the server or a geocoding service.
+## Why
 
-The code also supports signed-in resume analysis, follow-up revisions, and
-private application libraries with versions, notes, and interview/practice
-tracking. **These require a Landwise account on the hosted site and are not
-publicly available while account sign-in is disabled.** The local studio has
-its own working account/storage flow; see the local guide.
+AI resume rewriters can make you sound like someone else, or slip in skills you
+don't have. Landwise starts from your own words instead. The AI can only
+suggest edits to the bullet points you already wrote, and code checks every
+edit against your original resume before you see it. You get a resume that
+still sounds like you, an honest picture of where you fit, and a next step for
+every gap.
 
-Download guest drafts before closing or refreshing the tab. Unsaved inputs,
-results, and retry IDs are held in memory. A bounded server recovery cache is
-not a user-accessible application library or a backup.
+## Features
 
-## Hosting and costs
+- ✍️ **Small edits, never a rewrite** — the AI can only change existing bullet
+  points (lines starting with -, • or *), and server code applies its edits to
+  your original text. Every other line, like your name, contact details,
+  headings, and role and date lines, keeps your exact words (the preview and
+  downloads show common headings in capitals). No line is added, removed or
+  moved, and at most 35% of bullets, rounded up, change per run.
+- 🔎 **Evidence from your own words** — a fact counts as evidence only if its
+  quote is found in your original resume. Requirements without evidence become
+  gaps to work on, and a draft that adds a key term listed for one of those
+  gaps is rejected. That check matches exact words, so a synonym can still slip
+  through.
+- 🔢 **Your numbers stay yours** — each edited bullet keeps the numbers it
+  started with, and a draft with any new number is rejected. This covers
+  numbers written in digits, like 30% or 40, not numbers written as words.
+- 📊 **A fit report you can act on** — see which requirements your resume
+  already shows, which to build on, and which to learn or prove first, with a
+  next step for each. The match score is worked out by code from the AI's
+  matches to quotes in your original resume, so the draft's new wording can't
+  raise it. Because the AI judges the matches, the score can vary between runs.
+  It's an estimate, not an ATS score or a hiring prediction.
+- 📄 **A page count you can trust** — the page count shown in the app comes
+  from the same layout code that builds the PDF, so the two match. Text starts
+  at 11 pt and never goes below 10.5 pt. If a draft still can't fit your page
+  limit, you get an error, not tinier text or cut lines.
+- ⬇️ **PDF and Word downloads** — built in your browser from the draft on
+  screen, named after the job, with no watermark. The Word file copies the
+  PDF's line and page breaks, so editing it, or opening it without the Arial
+  font, can shift lines and pages. Check it before you send it.
+- ⏱️ **Watch it work** — Read, Match, Build and Check follow the server's real
+  progress, not a timer. Cancel any time; if something fails, your resume, job
+  description and previous draft stay where they were.
+- 🗓️ **Career events** — a hand-picked list of career fairs and organizer
+  calendars in a few Canadian and US cities, each linked to the organizer's own
+  page and sorted by distance if you share your location.
+  [More below ↓](#career-events)
+- 🆓 **Free to try** — on the live site you get one free tailoring per browser,
+  with no account, email or API key, and Landwise doesn't charge visitors. If a
+  run fails, you keep your free tailoring, but every try counts toward small
+  daily limits.
+- 💻 **Or use your own ChatGPT plan** — if you're comfortable running a Node.js
+  project, a local version on your computer signs in with your ChatGPT account,
+  where OpenAI allows it for your plan. No API key is needed, and your plan's
+  own usage limits apply. [Local setup →](docs/LOCAL_DEVELOPMENT.md)
 
-| Service | Role |
-| --- | --- |
-| Vercel | React frontend and the hosted Express API in a Node.js function |
-| Supabase | PostgreSQL spending/allowance ledger; account authentication and private application storage when enabled |
-| OpenAI API | Server-funded generation using the fixed `gpt-6-luna` adapter |
-| GitHub | Source and production deployments from `main` |
+## How a tailoring works
 
-Visitors are not charged by Landwise. **Operating AI is not free for the owner.**
-The application currently gates new work at US$4 per UTC month, 10 global
-attempts/day, 100/month, 3/IP/day, and one active job globally. Each job reserves
-US$0.06 before making provider calls. A guest gets one successful Transform per
-signed browser-cookie identity, not per proven human. Clearing cookies or using
-another browser can create another identity; the shared limits still apply.
+<table>
+<tr>
+<td align="center" width="33%"><img src="docs/images/tailor-progress.png" alt="Tailoring in progress: Read and Match are done and Build is working" width="260"><br><sub><b>1 · Watch it work</b><br>Read, match, build, check</sub></td>
+<td align="center" width="33%"><img src="docs/images/tailor-compare.png" alt="The original and revised versions of the three edited bullets" width="260"><br><sub><b>2 · See what changed</b><br>Each edited bullet, before and after</sub></td>
+<td align="center" width="33%"><img src="docs/images/tailor-fit-report.png" alt="The fit report with a match estimate of 71 out of 100" width="260"><br><sub><b>3 · See where you fit</b><br>Evidence, gaps and next steps</sub></td>
+</tr>
+</table>
 
-Operators must separately verify a provider spending stop and keep auto-reload
-OFF. The application gate does not configure the provider's billing settings.
-Keep the app's lower gate and review both usage records. Failed calls
-may cost money. Hard-limit enforcement can slightly overshoot while it
-propagates. [OpenAI spend limits](https://developers.openai.com/api/docs/guides/spend-limits)
+Upload a PDF or paste your resume, paste the job posting, and check the page
+limit. It starts at your PDF's page count, or an estimate for pasted text, and
+you can change it. Then Landwise works in four steps:
 
-Free hosting tiers do not promise uninterrupted availability. Read the
-[operating limits and outstanding work](docs/OPERATIONS.md#before-a-wider-launch)
-before promoting the site more widely.
+1. **Read.** It lists the job's requirements and quotes facts from your resume.
+   A quote that isn't in your resume is thrown out.
+2. **Match.** Each requirement is linked to your quoted evidence as a direct
+   match, a related one, or a gap.
+3. **Build.** The AI suggests edits to a few bullet points, aimed at the role.
+4. **Check.** Code applies the edits to your original resume and rejects the
+   draft if it breaks a rule, such as too many edits, changed numbers, dropping
+   an email or Education heading your original had, or adding key terms from
+   requirements you can't support. Then it lays out the pages. If the draft
+   runs long, Landwise asks the AI to shorten it once, and stops with an error
+   if it still doesn't fit.
 
-## Development and validation
+## Career events
 
-Use Node **24.x** (the production runtime and `.nvmrc` recommendation).
-The package also supports Node 22.12+; dependencies are locked in
-`package-lock.json`.
+<img src="docs/images/career-events.png" alt="Career events sorted nearest first, with the distance to each city center" width="900">
 
-```sh
-npm ci
-npm run security:setup
-npm run dev
-```
+Find hand-picked campus and public career fairs, plus organizer calendars, in a
+handful of cities in Canada and the United States. Then walk in with a resume
+that fits the role. No account needed.
 
-Local studio: **http://127.0.0.1:5174**, API: **127.0.0.1:3001**.
-This command starts the loopback ChatGPT integration, **not** the Vercel hosted
-API. Keep the exact `127.0.0.1` host for OAuth. No API key is needed for that
-local workflow. See [local setup and credentials](docs/LOCAL_DEVELOPMENT.md).
+- **From the source** — every listing links to the organizer's own page and
+  shows who can attend and when it was last checked. You register with the
+  organizer.
+- **Nearby first** — share your location to sort events by distance. It's
+  rounded, kept in memory, and never sent to Landwise or a map service.
+  Distances are to each city center.
+- **Filter and save** — search, filter by country, city, school and access,
+  sort by nearest or soonest, and save events in your browser.
+- **Past events hide themselves** — events drop off after their last day.
+  Listings are curated by hand, so check the organizer's page before you go.
 
-| Command | Purpose |
-| --- | --- |
-| `npm run check` | Secret scan, lint, all automated tests, hosted artifact checks, and local build |
-| `npm run security:setup` | Install commit/push secret guards in this clone |
-| `npm run security:history` | Scan all locally available Git history for secrets |
-| `npm run verify:hosted` | The checks Vercel must pass before a new production deployment |
-| `npm run build:hosted` | Hosted browser bundle in `dist-hosted`; checks for private credential references |
-| `npm run build` | Local studio browser bundle in `dist` |
-| `npm run preview:hosted` | Static hosted-bundle preview only; no API or server secrets |
-| `npm run check:live` | Hosted health, session/ledger, and public storage configuration checks; no AI generation |
-| `npm run clean` | Remove generated builds and Vercel build caches; preserve configuration, credentials, dependencies, and saved applications |
+## Your data
 
-Automated tests use mocked provider calls and a local PGlite PostgreSQL engine;
-they do not spend OpenAI credits. They do not prove live email delivery,
-provider billing controls, or all concurrent production schedules. A real AI
-smoke test spends allowance/credit and should be deliberate, not a health probe.
+- **No account to try it.** Your inputs and drafts are kept in the open tab,
+  not in an account. Refreshing or closing the tab clears them, so download
+  your draft first.
+- **What the AI sees.** On the live site, your resume and the job posting are
+  sent to OpenAI to make your draft.
+- **What the live site keeps.** Each run is recorded with fingerprints of your
+  input, browser and internet connection, not your resume text, and these
+  records are kept. A copy of each finished draft, which includes your resume
+  text and fit report, is cached on the server so a dropped connection can be
+  recovered by retrying in the same open tab. It can't be recovered after you
+  refresh or close the tab, and it isn't an account library or a backup. It
+  stops being recoverable after 7 days and is removed during later site
+  activity.
+- **A cookie**, kept for a year, lets Landwise know when you've used your free
+  tailoring.
+- **Uploaded PDFs** are read in memory and never written to disk.
+- **Server logs** record steps, timings and status codes, never your resume or
+  job description.
+- **Location** for nearby events is rounded, kept in memory, and never sent to
+  the server. Saved events stay in your browser.
 
-## Project structure
+## Good to know
 
-```text
-api/index.js                    Vercel entrypoint; imports only the hosted server
-server.js                       Loopback-only local entrypoint
-server/
-  hosted-app.js                 Hosted routes, admission, save and settlement
-  hosted-security.js            Guest cookies, CSRF, origin and verified user identity
-  hosted-budget.js              Service-only Supabase ledger RPC adapter
-  openai-inference.js           Fixed hosted model, call/time/cost bounds
-  ai-rate-limit.js              Provider rate-limit errors and retry delays
-  request-deadline.js           Whole-operation deadlines, including streamed bodies
-  hosted-pdf*.js                Isolated hosted PDF parsing worker
-  chatgpt-*.js                  Local-only ChatGPT authorization and inference
-  transform.js, revise.js       Shared tailoring and follow-up pipelines
-  transform-progress.js         Stage progress events; logs metadata only
-  resume-*.js, tailoring-report.js, rag.js, schemas.js, prompts.js
-                                Evidence, limited edits, retrieval and validation
-  application-store.js          Local files
-  cloud-storage.js, supabase-applications.js
-                                Verified per-user cloud libraries
-src/
-  App.jsx, use*.js              Workspace state and connection hooks
-  components/                   UI components and colocated styles
-  index.css, App.css            Shared typography tokens and workspace layout
-  resume*.js                    Preview structure and PDF/DOCX pagination/export
-  hostedAccess.js, cloudAccount.js, applicationApi.js
-                                Hosted access rules, account config and library requests
-  careerEvents.js, careerLocation.js
-                                Event filtering, distance sorting and in-memory location
-  data/careerEvents.js          Curated source-linked event directory
-supabase/migrations/            Immutable, already-applied database history
-scripts/                        Security, build, cleanup and live-check commands
-.githooks/                      Local commit and push guards (enable with security:setup)
-tests/                          Synthetic fixtures and automated regression tests
-docs/                           Deployment, operations, local setup and database guides
-```
+- Checks compare text, not meaning. A short quote can match inside a longer
+  word ("Java" inside "JavaScript"). Only numbers written in digits are
+  checked, not the words around them: "$1.5M" changed to "$1.5B" would pass,
+  and a number written as a word, like "five", isn't checked at all. Read every
+  draft before you send it.
+- Some accented letters (like Ł or ř) and non-Latin scripts don't display
+  correctly in the PDF, wherever they appear in your resume. The Word download
+  keeps them. Job postings written mostly in non-Latin scripts are not
+  accepted.
+- Resumes longer than about two pages may be too large to tailor, especially
+  with a long job posting, even though the app accepts up to 30,000
+  characters. If tailoring a long resume fails, shorten the resume or the job
+  posting and try again.
+- Only one tailoring runs at a time on the live site, and there are small daily
+  limits for the whole site and for each internet connection, so a shared
+  campus network can run out sooner. Every try counts, even one that fails. If
+  you hit a limit, try again later, which can mean tomorrow.
 
-Keep provider-specific code in its adapter, enforce quotas on the server/database,
-and share evidence/layout logic rather than duplicating it in new routes. UI
-font sizes live in `src/index.css`; component styles should use those tokens.
-Resume export typography is separate from the interface type scale.
+## Coming soon
 
-## Maintaining career events
+Accounts are built but not switched on for the live site yet. They add saved
+applications with versions, notes and interview practice tracking, follow-up
+edits such as "shorten the bullets", and resume analysis. The local version
+already includes these, saved on your computer by default.
 
-Edit `src/data/careerEvents.js`. Check the original organizer's date, location,
-registration and eligibility before updating `verifiedOn`. Use `kind: 'event'`
-for confirmed dates and `kind: 'calendar'` for ongoing organizer calendars.
-Expired dated events stop appearing after their final day in the visitor's local
-date. Listings are not fetched automatically; review them regularly.
+## For developers
 
-## Repository hygiene
+Landwise is a React 19 and Vite app with an Express 5 API, hosted on Vercel.
+The live site uses Supabase (PostgreSQL) for usage limits, its spending ledger
+and a 7-day cache of finished drafts, and the OpenAI API for tailoring. Setup,
+commands, project structure and hosting costs are in the
+[developer guide](docs/DEVELOPMENT.md).
 
-Generated outputs, `.vercel`, `.env*` except `.env.example`, and
-`node_modules` stay out of Git. Do not put resume samples, logs containing
-personal data, database backups, or account credentials in the repository.
+[Architecture](ARCHITECTURE.md) · [Quality rules](QUALITY.md) ·
+[Security](SECURITY.md) · [Operations](docs/OPERATIONS.md) ·
+[Deployment](docs/DEPLOYMENT.md) · [Local studio](docs/LOCAL_DEVELOPMENT.md) ·
+[Supabase](docs/SUPABASE.md)
 
-`npm run security:setup` turns on two local Git hooks. Before each commit, the
-staged files are scanned with a pinned Gitleaks release, and private files are
-refused: `.env*`, credential and key files, PDF/DOCX, database files (`.db`,
-`.sqlite`, `.dump`, `.bak`), and anything under folders such as `private/`,
-`backups/` or `uploads/`. Plain `.sql` files are not refused, so keep SQL dumps
-out of the repository. Before each push, all local Git history is scanned the
-same way. Findings show only file, line and rule, never the value.
-Hooks can be bypassed with `--no-verify`, so they support review rather than
-replace it. See [SECURITY.md](SECURITY.md) for history audits and the controls
-to enable before changing repository visibility.
-Keep migrations even when they contain legacy trial groundwork: they are
-applied database history, not disposable files.
+## License
 
-There is no `LICENSE` file yet. Without one, a public repository can be viewed
-but not reused; add a license before distributing it as open source.
+There is no license yet, so all rights are reserved. You can read the code and
+fork it on GitHub, but not reuse it elsewhere without permission.
