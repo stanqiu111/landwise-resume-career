@@ -7,7 +7,7 @@ use [OPERATIONS.md](OPERATIONS.md).
 
 | Setting | Current value |
 | --- | --- |
-| Public URL | https://landwise-nu.vercel.app |
+| Public URL | https://landwise-resume.vercel.app |
 | Vercel project | `landwise`, Hobby |
 | Source / production branch | `stanqiu111/landwise-resume-career` / `main` |
 | Node runtime | 24.x |
@@ -34,7 +34,7 @@ it does not describe the live values.
 
 | Variable | Hosted purpose |
 | --- | --- |
-| `LANDWISE_APP_ORIGIN` | Exact HTTPS origin, currently `https://landwise-nu.vercel.app`, no trailing slash |
+| `LANDWISE_APP_ORIGIN` | Exact HTTPS origin, currently `https://landwise-resume.vercel.app`, no trailing slash |
 | `LANDWISE_HOSTED_AI_ENABLED` | Live value `true`; turn off and redeploy to stop new AI admission |
 | `LANDWISE_ACCOUNT_SIGN_IN_ENABLED` | Live value `false`; enable only after auth delivery and two-user isolation checks |
 | `LANDWISE_SESSION_SECRET` | Stable random server-only secret, at least 32 bytes |

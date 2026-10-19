@@ -13,7 +13,7 @@ students.
 
 <br>
 
-[![Live site](https://img.shields.io/badge/live-landwise--nu.vercel.app-3b5bdb?style=flat-square&logo=vercel&logoColor=white)](https://landwise-nu.vercel.app)
+[![Live site](https://img.shields.io/badge/live-landwise--resume.vercel.app-3b5bdb?style=flat-square&logo=vercel&logoColor=white)](https://landwise-resume.vercel.app)
 ![No signup](https://img.shields.io/badge/signup-not%20needed-22c55e?style=flat-square)
 ![No API key](https://img.shields.io/badge/API%20key-not%20needed-22c55e?style=flat-square)
 ![PDF and DOCX](https://img.shields.io/badge/export-PDF%20%26%20DOCX-a78bfa?style=flat-square)
@@ -24,7 +24,7 @@ students.
 
 <img src="docs/images/hero.png" alt="The Landwise resume studio with a tailored draft ready to review and download" width="900">
 
-### [🌐 Try it at landwise-nu.vercel.app](https://landwise-nu.vercel.app)
+### [🌐 Try it at landwise-resume.vercel.app](https://landwise-resume.vercel.app)
 
 One free tailoring per browser: no account, no email, no API key.<br>
 <sub>Screenshots show an invented student and job from a scripted demo run, so

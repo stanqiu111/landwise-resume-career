@@ -21,7 +21,7 @@ filesystem is not a durable application database.
 **After every deployment:**
 
 1. Confirm the intended Git commit is Ready in Vercel and attached to
-   `https://landwise-nu.vercel.app`.
+   `https://landwise-resume.vercel.app`.
 2. Run `npm run check:live`. It checks hosted configuration, a guest session
    against the ledger, and public storage config without generating a resume.
    `aiAvailable:false` may mean a budget, capacity or allowance limit; inspect

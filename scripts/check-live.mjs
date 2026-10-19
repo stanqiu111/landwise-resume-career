@@ -1,7 +1,7 @@
 // Read-only smoke checks: no resume upload, generation, or paid provider call.
-const origin = new URL(process.argv[2] || 'https://landwise-nu.vercel.app');
+const origin = new URL(process.argv[2] || 'https://landwise-resume.vercel.app');
 if (origin.protocol !== 'https:' || origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password) {
-  throw new Error('Pass an HTTPS origin, for example https://landwise-nu.vercel.app');
+  throw new Error('Pass an HTTPS origin, for example https://landwise-resume.vercel.app');
 }
 async function get(path) {
   const response = await fetch(new URL(path, origin), { redirect: 'error', signal: AbortSignal.timeout(20000) });

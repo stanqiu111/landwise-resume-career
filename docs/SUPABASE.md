@@ -2,7 +2,7 @@
 
 Updated October 19, 2026. The deployment uses a Supabase Free project.
 The public URL is
-**https://landwise-nu.vercel.app**.
+**https://landwise-resume.vercel.app**.
 
 All three migrations, including the hosted AI ledger, are applied remotely.
 **Guest hosted AI is active** after a live synthetic Transform, committed-cost
@@ -54,7 +54,7 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    email delivery. No resumes or AI jobs were created by these checks.
 3. Configure exact authentication redirects. Local testing uses
    `http://127.0.0.1:5174/`; production uses
-   `https://landwise-nu.vercel.app/`. Set up and verify custom SMTP for email
+   `https://landwise-resume.vercel.app/`. Set up and verify custom SMTP for email
    links, or implement/configure and verify a supported Google OAuth flow.
    Leave `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` until that work is complete.
 4. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in server configuration.
