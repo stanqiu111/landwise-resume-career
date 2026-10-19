@@ -1,6 +1,6 @@
 # Deployment status
 
-Updated October 17, 2026.
+Updated October 19, 2026.
 
 ## Live site and activation status
 
@@ -8,10 +8,12 @@ Current URL: **https://landwise-nu.vercel.app**. Vercel project
 `personal-93a7/landwise` is on Hobby, connected to `stanqiu111/landwise`, production
 branch `main`.
 
-The hosted studio and API are deployed. **Paid AI and public account sign-in
-remain disabled** until their activation checks are complete. Deployment
-`dpl_8Rk9DxrDD6QYbWnkx5EEkr8hPgcU` from commit `e9f6b69` reached Ready on
-October 17, 2026. No paid provider call was made.
+The hosted studio and API are deployed. **Public AI and public account sign-in
+remain disabled** until their activation checks are complete. On October 19,
+protected staged production deployment `dpl_4J6hZarctprihC2yNFrqCn2rhhnA`
+reached Ready and successfully checked the Supabase budget service. It was
+created with `--skip-domain` and has not been promoted. No paid provider call
+was made.
 
 | Item | Verified state |
 | --- | --- |
@@ -20,10 +22,10 @@ October 17, 2026. No paid provider call was made.
 | Shared spending ledger | Applied; automated tests and live permission checks pass |
 | Foundation and application storage-limit migrations | Applied to the selected Supabase project |
 | AI budget migration, `202610170002_landwise_ai_budget.sql` (migration003) | Applied remotely; permissions/counts verified |
-| Hosted OpenAI API key | Not configured or used for a live test |
-| Hosted Supabase service-role key | Not configured in the runtime |
+| Hosted OpenAI API key | Saved as Production Secret `OPENAI_API_KEY`; provider access not yet tested |
+| Hosted Supabase service-role key | Saved as Production Secret `Supabase_Key`; protected runtime budget-status RPC succeeded |
 | Provider-side US$5 spending stop | Not verified; required before activation |
-| Public account email delivery | Custom SMTP toggle is OFF; delivery is not verified |
+| Public account email delivery | Custom SMTP was OFF at the October 17 check; delivery is not verified |
 | Public account sign-in | Keep `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` |
 
 The new source configuration builds `npm run build:hosted` into `dist-hosted`
@@ -32,12 +34,20 @@ Vercel function limit. `npm run build:public` still produces the separate static
 `npm run dev` and `npm run build` retain the local studio. Local ChatGPT account
 files and account-picker routes are excluded from the hosted runtime.
 
-Six hosted environment settings have been saved in Vercel, including the
-session secret, public Supabase configuration and both feature flags set to
-false. This does not activate inference; the API and service-role keys are
-still absent.
+Eight hosted environment settings are saved in Vercel, including both private
+provider/service credentials. `Supabase_Key` uses the server-only compatibility
+alias described below. The staged deployment overrides the AI flag to true
+behind Vercel authentication; the public deployment still returns
+`configured:false`. Secret values were not downloaded or printed.
 
-Live checks: `/api/health`, `/api/storage/config` and `/api/session` return JSON
+October 19 checks: unauthenticated staged access redirects to Vercel sign-in.
+An authenticated CLI request to its `/api/session` returned HTTP 200 with
+`available:true`, `guestEligible:true`, `remaining:1` and a CSRF token. This
+validates the runtime Supabase key and ledger access, but does not validate the
+OpenAI key, paid inference, settlement or provider billing controls. Browser
+access was unavailable, so those billing settings remain unverified.
+
+Earlier October 17 live checks: `/api/health`, `/api/storage/config` and `/api/session` returned JSON
 200 with `Cache-Control: no-store`. Session availability is false with reason
 `configuration`, and its cookie is Secure/HttpOnly. The public config contains
 only Supabase's publishable key and settings. `/api/auth/session`, `/.env` and
@@ -171,11 +181,21 @@ jobs were created by the migration checks. The project remains on Free.
    `SUPABASE_PUBLISHABLE_KEY`. Never prefix secrets with `VITE_`, commit them,
    return them from API routes or put them in browser code. Local account
    credentials are not required or permitted in the hosted runtime.
-4. Keep both feature flags false for the initial configuration check. Build and
-   inspect the hosted artifact, deploy it with AI unavailable, then verify
-   origin/CSRF enforcement, guest identity, key isolation and database access.
-   Enable `LANDWISE_HOSTED_AI_ENABLED=true` only after spending controls and
-   one bounded end-to-end provider test are verified.
+   For deployment compatibility, the exact-case secret name `Supabase_Key` is
+   accepted server-side only when `SUPABASE_SERVICE_ROLE_KEY` is absent. A
+   supplied canonical value always takes precedence, including an invalid or
+   empty value; the same secret/service-role key validation applies to both.
+   Existing write-only secrets under the alias need not be re-entered. Neither
+   name is exposed through public configuration or accepted as the publishable key.
+4. Keep public AI and account sign-in flags false. Build and inspect the hosted
+   artifact, then create a **Vercel-protected, unpromoted staged production
+   deployment** with AI disabled. Verify origin/CSRF enforcement, guest identity,
+   key isolation and database access. Once the spending controls are verified,
+   enable `LANDWISE_HOSTED_AI_ENABLED=true` only on that protected staged
+   deployment for a bounded end-to-end provider test. Promote it to the public
+   domain only after the controls and test pass. The public deployment's AI
+   flag must remain false until that promotion; do not enable public AI merely
+   to perform the activation test.
 5. Keep `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` until custom SMTP or a supported
    Google OAuth sign-in flow, exact production redirects and real sign-in have
    been configured and tested. Google OAuth is an alternative configuration

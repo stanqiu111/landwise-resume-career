@@ -13,7 +13,7 @@ async function inspect(directory) {
     if (entry.isDirectory()) await inspect(filename);
     else if (/\.(?:html|js|css|svg)$/.test(entry.name)) {
       const source = await readFile(filename, 'utf8');
-      for (const value of ['/api/auth/', 'SUPABASE_SERVICE_ROLE_KEY', 'OPENAI_API_KEY', 'chatgpt.json']) {
+      for (const value of ['/api/auth/', 'SUPABASE_SERVICE_ROLE_KEY', 'Supabase_Key', 'OPENAI_API_KEY', 'chatgpt.json']) {
         if (source.includes(value)) throw new Error(`Server credential reference in hosted output: ${filename}`);
       }
       if (/(?:sb_secret_|sk-proj-)[A-Za-z0-9_-]{20,}/.test(source)) throw new Error(`Secret-shaped value in hosted output: ${filename}`);

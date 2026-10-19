@@ -158,3 +158,31 @@ test('unconfigured production is honest and cannot expose owner login routes', a
   for (const path of ['/api/auth/session', '/api/auth/login', '/api/ai/models']) assert.equal((await fetch(base + path)).status, 404);
   assert.equal((await fetch(base + '/api/transform', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })).status, 503);
 });
+
+test('hosted secret alias is server-only, case-sensitive and never overrides canonical key validation', async t => {
+  const environment = {
+    LANDWISE_APP_ORIGIN: origin, LANDWISE_SESSION_SECRET: 's'.repeat(48),
+    SUPABASE_URL: 'https://example.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+    OPENAI_API_KEY: 'sk-proj-test_not_a_real_provider_key', LANDWISE_HOSTED_AI_ENABLED: 'true',
+  };
+  for (const [name, keys, configured] of [
+    ['existing alias', { Supabase_Key: 'sb_secret_alias_test' }, true],
+    ['canonical preferred', { SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_canonical_test', Supabase_Key: 'invalid' }, true],
+    ['invalid canonical fails closed', { SUPABASE_SERVICE_ROLE_KEY: 'sb_publishable_wrong', Supabase_Key: 'sb_secret_alias_test' }, false],
+    ['empty canonical fails closed', { SUPABASE_SERVICE_ROLE_KEY: '', Supabase_Key: 'sb_secret_alias_test' }, false],
+    ['public alias rejected', { Supabase_Key: 'sb_publishable_wrong' }, false],
+    ['user JWT alias rejected', { Supabase_Key: token }, false],
+    ['wrong case ignored', { SUPABASE_KEY: 'sb_secret_alias_test' }, false],
+  ]) {
+    await t.test(name, async t => {
+      const base = await serve(t, hostedAppFromEnvironment({ ...environment, ...keys }));
+      assert.deepEqual(await (await fetch(base + '/api/health')).json(), { mode: 'hosted', configured });
+      const publicConfig = await (await fetch(base + '/api/storage/config')).json();
+      assert.deepEqual(publicConfig, {
+        storage: 'supabase', url: environment.SUPABASE_URL,
+        publishableKey: environment.SUPABASE_PUBLISHABLE_KEY, mode: 'hosted', signInEnabled: false,
+      });
+      assert.doesNotMatch(JSON.stringify(publicConfig), /sb_secret_|sk-proj-|Supabase_Key|SUPABASE_SERVICE_ROLE_KEY/);
+    });
+  }
+});

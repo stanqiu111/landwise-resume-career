@@ -63,10 +63,18 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    accepted; secret/service-role keys are rejected in this field.
 5. Hosted AI additionally needs server-only `SUPABASE_SERVICE_ROLE_KEY`,
    `OPENAI_API_KEY` and a stable random `LANDWISE_SESSION_SECRET` of at least
-   32 bytes. Set the exact HTTPS `LANDWISE_APP_ORIGIN`. Never put these secrets
+   32 bytes. The existing deployment name `Supabase_Key` (case-sensitive) is
+   accepted only as a server-side fallback when `SUPABASE_SERVICE_ROLE_KEY` is
+   absent. A supplied canonical value takes precedence even if invalid or empty;
+   both names retain the same secret/service-role key validation. This alias does
+   not replace the browser's `SUPABASE_PUBLISHABLE_KEY` or require re-entering an
+   existing write-only deployment secret. Set the exact HTTPS
+   `LANDWISE_APP_ORIGIN`. Never put these secrets
    in `VITE_*` variables, frontend builds, Git or logs. Enable
    `LANDWISE_HOSTED_AI_ENABLED` only after the separate spending/activation
-   checks in [DEPLOYMENT.md](./DEPLOYMENT.md#activation-procedure).
+   checks in [DEPLOYMENT.md](./DEPLOYMENT.md#activation-procedure). Paid testing
+   must use a Vercel-protected, unpromoted staged production deployment; public
+   AI remains disabled until that deployment passes its checks and is promoted.
 6. Before exposing account sign-in, use two real test accounts: save the same
    JD in each, verify distinct libraries, and confirm neither can read, edit or
    delete the other's application ID. Account switches must clear the studio

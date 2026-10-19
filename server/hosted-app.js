@@ -188,7 +188,9 @@ export function hostedAppFromEnvironment(env = process.env) {
     cloudStorage = createCloudStorage({ url: env.SUPABASE_URL, publishableKey: env.SUPABASE_PUBLISHABLE_KEY });
     security = createHostedSecurity({ appOrigin: env.LANDWISE_APP_ORIGIN, sessionSecret: env.LANDWISE_SESSION_SECRET,
       production: env.VERCEL === '1', trustVercel: env.VERCEL === '1', cloudStorage });
-    budget = createHostedBudget({ url: env.SUPABASE_URL, serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY });
+    // Retain the existing deployment's secret name without exposing it publicly.
+    // A supplied canonical key always wins, including an invalid/empty value.
+    budget = createHostedBudget({ url: env.SUPABASE_URL, serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY ?? env.Supabase_Key });
     if (env.OPENAI_API_KEY?.trim()) inference = createOpenAIInference({ apiKey: env.OPENAI_API_KEY });
   } catch { /* Configuration must never expose credential values in logs. */ }
   return createHostedApp({ security, cloudStorage, budget, inference, enabled: env.LANDWISE_HOSTED_AI_ENABLED === 'true', signInEnabled: env.LANDWISE_ACCOUNT_SIGN_IN_ENABLED === 'true' });
