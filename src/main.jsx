@@ -13,7 +13,7 @@ const Root = lazy(() => import.meta.env.VITE_LANDWISE_HOSTED === 'true'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Suspense fallback={<p role="status" style={{ padding: '32px', fontFamily: 'Arial, sans-serif' }}>Opening Landwise…</p>}>
+    <Suspense fallback={<p role="status" style={{ padding: '32px', fontSize: 'var(--text-sm)' }}>Opening Landwise…</p>}>
       <Root />
     </Suspense>
   </StrictMode>,

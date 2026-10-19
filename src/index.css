@@ -1,3 +1,23 @@
+:root {
+  /* Native typography, matching the system-font approach used by openGym. */
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --text-xs: .6875rem;
+  --text-sm: .75rem;
+  --text-control: .8125rem;
+  --text-body: .875rem;
+  --text-lead: 1rem;
+  --text-card: 1.125rem;
+  --text-panel: 1.25rem;
+  --weight-heading: 600;
+  font-family: var(--font-ui);
+}
+
+html {
+  /* Keep mobile browsers from enlarging individual blocks of helper text. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 #root {
   min-height: 100vh;
 }
