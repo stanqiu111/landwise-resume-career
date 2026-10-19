@@ -3,15 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
   "scripts": {
     "dev": "concurrently --kill-others-on-fail \"node server.js\" \"vite\"",
     "server": "node server.js",
     "build": "vite build",
-    "build:public": "node scripts/build-public.mjs",
     "build:hosted": "node scripts/build-hosted.mjs",
+    "verify:hosted": "npm run lint && npm test && npm run build:hosted",
+    "check": "npm run verify:hosted && npm run build",
+    "check:live": "node scripts/check-live.mjs",
+    "clean": "node scripts/clean.mjs",
     "lint": "eslint .",
     "test": "node --test",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:hosted": "vite preview --outDir dist-hosted"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

@@ -13,7 +13,7 @@ provider hard limit and auto-reload OFF on October 19; dashboard settings were
 not independently observed. The application separately enforces US$4/month.
 Custom SMTP was OFF at the October 17 check; public email delivery is unverified.
 Keep public account sign-in disabled until its authentication flow is ready.
-See [deployment status](./DEPLOYMENT.md) for the live/source distinction.
+See [deployment settings](./DEPLOYMENT.md) and the [operations guide](./OPERATIONS.md).
 
 ## Application ownership and stored data
 
@@ -49,7 +49,7 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    adopting CLI deployment.
 2. Hosted pilot: `202610170002_landwise_ai_budget.sql` is also already applied
    via the SQL Editor. It adds private tables and service-role-only spending,
-   allowance and upload RPCs. Live verification found seven protected ledger
+   allowance and upload RPCs. Verification immediately after migration found seven protected ledger
    tables, five server RPCs, zero browser-callable RPCs, five service-role-callable
    RPCs and zero AI jobs. It does not activate AI, fund an API account or configure
    email delivery. No resumes or AI jobs were created by these checks.
@@ -75,7 +75,7 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    `LANDWISE_APP_ORIGIN`. Never put these secrets
    in `VITE_*` variables, frontend builds, Git or logs. Enable
    `LANDWISE_HOSTED_AI_ENABLED` only after the separate spending/activation
-   checks in [DEPLOYMENT.md](./DEPLOYMENT.md#activation-procedure). Paid testing
+   checks in [DEPLOYMENT.md](./DEPLOYMENT.md#activation-procedure). For a fresh activation, paid testing
    must use a Vercel-protected, unpromoted staged production deployment; public
    AI remains disabled until that deployment passes its checks and is promoted.
 6. Before exposing account sign-in, use two real test accounts: save the same
@@ -108,10 +108,11 @@ allowance. A successful result still counts if saving its application fails.
 The provider adapter permits at most four calls/job, 60,000 UTF-8 bytes/request,
 12,000 output tokens/call and 60 seconds/call. Work has a 240-second route budget
 inside the 300-second function limit, with remaining time reserved for save and
-settlement. No provider auto-retry or automatic credit reload is enabled.
-**The US$5 provider-side spending stop remains unverified.** An alert-only
-budget is insufficient; the application gate is not proof of a billing hard
-cap. Keep AI disabled until that stop and the US$1 margin are established.
+settlement. The adapter has no automatic provider retry. The owner confirmed auto-reload
+OFF and a US$5 provider hard limit on October 19; those dashboard settings
+have not been independently verified. An alert-only budget is insufficient.
+Keep the separate US$4 application gate and recheck billing controls before
+reactivation or model/budget changes. See the [operations guide](OPERATIONS.md).
 
 The AI migration exposes only these server-role RPCs:
 

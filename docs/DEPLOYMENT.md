@@ -1,279 +1,180 @@
-# Deployment status
+# Deployment reference
 
-Updated October 19, 2026.
+Reviewed October 19, 2026. For routine checks, outages, backups and rollback,
+use [OPERATIONS.md](OPERATIONS.md).
 
-## Live site and activation status
+## Current service
 
-Current URL: **https://landwise-nu.vercel.app**. Vercel project
-`personal-93a7/landwise` is on Hobby, connected to `stanqiu111/landwise`, production
-branch `main`.
-
-**Guest resume tailoring is live. Public account sign-in remains disabled.**
-On October 19, protected staged deployment
-`dpl_FZPywr9biHpuHJvBLdpKk9ALRaEQ` passed a real synthetic Transform and its
-replay/allowance checks, then was promoted to the public domain. The production
-AI flag is true; the account sign-in flag stays false. Subsequent Git deployments
-inherit these flags.
-
-| Item | Verified state |
+| Setting | Current value |
 | --- | --- |
-| Hosted studio and career events | Deployed at the URL above |
-| Hosted API and guest identity | Guest AI enabled; live configuration and secure cookie verified |
-| Shared spending ledger | Live reservation contention, settlement, replay and allowance checks pass |
-| Foundation and application storage-limit migrations | Applied to the selected Supabase project |
-| AI budget migration, `202610170002_landwise_ai_budget.sql` (migration003) | Applied remotely; permissions/counts verified |
-| Hosted OpenAI API key | Production Secret `OPENAI_API_KEY`; three-call live Transform succeeded |
-| Hosted Supabase service-role key | Saved as Production Secret `Supabase_Key`; protected runtime budget-status RPC succeeded |
-| Provider-side US$5 spending stop | Owner confirmed hard limit enabled and auto-reload OFF on October 19; no independent dashboard verification |
-| Public account email delivery | Custom SMTP was OFF at the October 17 check; delivery is not verified |
-| Public account sign-in | Keep `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` |
+| Public URL | https://landwise-nu.vercel.app |
+| Vercel project | `personal-93a7/landwise`, Hobby |
+| Source / production branch | `stanqiu111/landwise` / `main` |
+| Node runtime | 24.x |
+| Install | `npm ci` |
+| Production build | `npm run verify:hosted` |
+| Static output | `dist-hosted` |
+| API entrypoint | `api/index.js`; `/api/:path*` rewrite in `vercel.json` |
+| Function duration | Configured maximum 300 seconds |
+| Supabase | Personal / Free, `supabase-amber-pebble` (`audfewrmqgsefeutappd`) |
+| Guest AI | Enabled; fixed API-funded `gpt-6-luna` |
+| Account onboarding | Disabled; public email delivery not verified |
 
-The new source configuration builds `npm run build:hosted` into `dist-hosted`
-and rewrites `/api/:path*` to the `api/index.js` entrypoint, with a 300-second
-Vercel function limit. `npm run build:public` still produces the separate static preview.
-`npm run dev` and `npm run build` retain the local studio. Local ChatGPT account
-files and account-picker routes are excluded from the hosted runtime.
+`vercel.json` is the source-controlled deployment configuration. Vercel must pass
+lint, all tests and the hosted credential-reference scan before replacing the
+live alias. The former static coming-soon build has been removed. `npm run dev`
+remains the separate local ChatGPT studio; never deploy `server.js` publicly.
 
-Both private credentials remain in Vercel as Production Secrets. `Supabase_Key`
-uses the server-only compatibility alias described below; values were never
-downloaded or printed. Provider pricing was rechecked against official OpenAI
-documentation on October 19. Dashboard access was unavailable, so the provider
-hard-limit and auto-reload settings are owner-confirmed rather than independently
-observed. Application limits below are enforced independently in PostgreSQL.
+## Environment variables
 
-The first live test completed extraction but its matching request was rejected.
-Its failed reservation settled and preserved the guest allowance. Adding the
-explicit JSON instruction to actual input messages resolved the matching-style
-regression and the second live test. The original provider error detail was not
-available, so input-only JSON validation remains the likely, not proven, cause.
+Store private values as Vercel Production Secrets, not frontend variables.
+New values/flags take effect only after redeployment. `.env.example` is a safe
+local/new-install template and intentionally defaults hosted feature flags off;
+it does not describe the live values.
 
-The successful synthetic one-page resume finished in 27 seconds, preserved both
-experiences and their purposes, made one small bullet edit, and returned an 88
-evidence-match score. Unsupported Kubernetes experience stayed out of the resume
-and appeared in the learning report. The ledger settled 1,754 microUSD
-(US$0.001754); an identical request returned the exact cached result and the same
-charge with no processing steps. Changed input with the same ID returned 409;
-a new ID for the used guest returned 429. The used guest had zero remaining
-trials; a fresh guest was available, confirming the global reservation cleared.
-The earlier failed job conservatively settled 14,150 microUSD, including its
-uncertain rejected call. These are application ledger amounts, not a billing
-dashboard reconciliation.
-
-A temporary protected harness raced two distinct reservation RPCs while holding
-the winner: exactly one was admitted and the other returned `hosted_ai_busy`.
-Its guard and winner both settled failed at known cost zero, with no provider
-calls. Repeating the harness skipped the race. Attempt counters were preserved.
-This exercised real concurrent RPC admission, not every possible database
-schedule. The temporary deployment was removed and was never published.
-
-Public API checks return JSON with `Cache-Control: no-store`; health is
-`configured:true`, fresh guest availability is true, and the cookie is
-Secure/HttpOnly. Public configuration includes only the publishable Supabase
-settings and `signInEnabled:false`. Owner auth and temporary probe routes are
-absent. Browser visual checks were unavailable on October 19; prior October 17
-browser QA showed no console errors.
-
-## Hosted pilot architecture and limits
-
-The hosted service uses a **server-funded OpenAI API key**, with the model fixed
-in `server/openai-inference.js`. Visitors do not supply API keys or connect a
-ChatGPT subscription. Local ChatGPT sign-in is a separate development workflow;
-it is not the hosted billing mechanism.
-
-A guest can complete one Transform without signing up. A verified Landwise
-account can complete three AI jobs per UTC month, shared between Transform,
-Analyze and follow-up revisions. Guests need an account for Analyze and
-follow-up revisions. Cloud libraries belong to the verified Supabase user.
-Guest results are downloadable but are not automatically assigned a cloud
-application folder.
-
-| Limit | Enforced value in the implementation |
+| Variable | Hosted purpose |
 | --- | --- |
-| Application AI budget | US$4 per UTC month, including active reservations |
-| Worst-case reservation before each job | US$0.06 / 60,000 microUSD |
-| Global AI attempts | 10 per UTC day; 100 per UTC month |
-| AI attempts per trusted IP hash | 3 per UTC day |
-| Global active AI jobs | 1 |
-| Guest allowance | 1 successful Transform per guest-cookie identity, lifetime |
-| Verified account allowance | 3 successful AI jobs per UTC month |
-| Provider calls | At most 4 per job; no automatic provider retries |
-| Provider input/output | 60,000 UTF-8 bytes per serialized request; 12,000 output tokens per call |
-| Provider call deadline | 60 seconds |
-| Route work deadline | Up to 240 seconds from route entry, including auth and reservation time |
-| HTTP AI input | 60,000 UTF-8 bytes; resume 30,000 characters; JD 50–20,000 characters |
-| Follow-up instruction | 2,000 characters |
-| PDF parsing | 1 PDF, at most 2 MiB, 1–20 pages, 30,000 extracted characters |
-| PDF processing | Credential-free worker; 10-second deadline; one worker per process; 128 MiB old-generation heap |
-| PDF worker | 10-second deadline; at most 1 worker per server process |
-| PDF upload attempts | 100 globally/day; 10 per IP/day; 10 per guest/day |
-| Recovery result cache | 220,000 serialized UTF-8 bytes per job; 10 MiB globally |
-| Recovery window | Up to 7 days, with earlier eviction when the cache is full |
+| `LANDWISE_APP_ORIGIN` | Exact HTTPS origin, currently `https://landwise-nu.vercel.app`, no trailing slash |
+| `LANDWISE_HOSTED_AI_ENABLED` | Live value `true`; turn off and redeploy to stop new AI admission |
+| `LANDWISE_ACCOUNT_SIGN_IN_ENABLED` | Live value `false`; enable only after auth delivery and two-user isolation checks |
+| `LANDWISE_SESSION_SECRET` | Stable random server-only secret, at least 32 bytes |
+| `SUPABASE_URL` | `https://audfewrmqgsefeutappd.supabase.co` |
+| `SUPABASE_PUBLISHABLE_KEY` | Browser-safe project key; never a secret/service-role key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only ledger credential; canonical name for new setups |
+| `Supabase_Key` | Existing production secret's exact-case compatibility alias, used only when the canonical variable is absent |
+| `OPENAI_API_KEY` | Dedicated server-funded project key |
 
-PDF workers receive no environment credentials. Their V8 heap limits are
-128 MiB old generation, 16 MiB young generation and 4 MiB stack. Process RSS
-checks at 50 ms intervals stop parsing above 512 MiB total or 192 MiB growth.
-RSS checks are best-effort pressure protection, not an OS sandbox or a hard
-memory ceiling; native allocations can grow between samples.
+A supplied canonical service-role variable always wins, even if empty/invalid.
+Do not set both without understanding that precedence. No `VITE_*` variable may
+contain a secret. The hosted server never needs local ChatGPT account files.
+The public storage-config response intentionally includes the publishable key.
 
-Database transactions enforce shared allowances across workers before inference
-starts. Failures preserve the success allowance but count against attempts and
-spending. Verified provider usage settles the reservation; an uncertain sent
-call receives a conservative cost estimate, and unknown job cost retains the
-full reservation. A cost overrun is recorded rather than hidden. Spending and
-attempts belong to the UTC reservation month; successful account jobs belong
-to the UTC completion month. A successful draft still consumes its allowance
-if saving it to the application library fails.
+The selected service uses the owner's API credits, not their ChatGPT plan.
+Owner confirmation on October 19: OpenAI US$5 monthly hard limit enabled and
+auto-reload OFF. No independent dashboard verification is recorded. The app
+separately gates admission at US$4/month. Keep these distinct; failed requests
+can still incur cost and provider enforcement is not instantaneous.
+[Spend-limit behavior](https://developers.openai.com/api/docs/guides/spend-limits)
 
-PDF workers are terminated on timeout or disconnect. A 50 ms RSS monitor stops
-processing above 512 MiB total process memory or 192 MiB growth; this is best
-effort pressure protection, not an OS memory ceiling. Build the native canvas
-dependency on Vercel/Linux; do not deploy a macOS prebuilt server bundle.
+## Hosted limits
 
-The guest cookie is signed, HttpOnly, SameSite=Lax and Secure in production. It
-identifies a browser history, **not one human**. Clearing cookies, incognito
-mode, another browser or cookie expiry can create a new guest identity. IP
-limits and global budgets bound that exposure; shared campus IPs can also share
-a limit. Keep `LANDWISE_SESSION_SECRET` stable across deployments. Changing it
-invalidates cookies and changes the quota identity hashes.
-
-Request UUIDs are tied to the verified actor, operation and input hash. Repeating
-the same request retrieves its completed cached result or reports its existing
-state; it never starts another AI job. Reusing the UUID with different input is
-rejected. Expired cached results are unavailable immediately but are deleted
-only on a later status, reserve or successful complete operation. With no later
-activity, expired rows can persist beyond seven days. Ledger and entitlement
-records remain after cache eviction or application deletion.
-
-## Applied application storage limits
-
-Selected Supabase organization: **Personal / Free**. Project:
-`supabase-amber-pebble` (`audfewrmqgsefeutappd`),
-https://audfewrmqgsefeutappd.supabase.co.
-
-| Limit | Enforced value |
+| Limit | Value |
 | --- | --- |
-| Applications per user | 50 |
-| Versions per application | 10 |
-| Serialized saved payload per user | 5 MiB |
-| Serialized saved payload across all users | 100 MiB |
-| History events per application | 100 |
-| Notes per application | 12,000 characters |
-| Practice tasks per application | 100; title at most 1,000 characters |
-| Saved resume page target | 1–20 pages |
+| Monthly application AI budget | US$4 per UTC month, including active reservations |
+| Reservation/job | US$0.06 (60,000 microUSD) |
+| Global attempts | 10 per UTC day; 100 per UTC month |
+| Attempts/trusted IP hash | 3 per UTC day |
+| Global active jobs | 1 |
+| Guest allowance | 1 successful Transform per cookie identity |
+| Verified-account allowance | 3 successful AI actions per UTC month, across Transform/Analyze/revise |
+| Provider calls | At most 4/job; no automatic retries |
+| Provider request/output | 60,000 UTF-8 bytes serialized input; 12,000 output tokens/call |
+| Provider deadline | 60 seconds/call |
+| Route work deadline | Up to 240 seconds from entry, including auth/reservation time |
+| HTTP AI payload | 60,000 UTF-8 bytes; resume up to 30,000 chars; JD 50–20,000 chars |
+| Follow-up instruction | Up to 2,000 chars |
+| Hosted PDF | One file up to 2 MiB, 1–20 pages, up to 30,000 extracted chars |
+| PDF upload admission | 100/day globally; 10/IP/day; 10/guest/day |
+| PDF worker | Credential-free; 10-second deadline; one worker/process |
+| Recovery cache | 220,000 serialized UTF-8 bytes/job; 10 MiB total; up to 7 days, earlier eviction when full |
 
-Database triggers enforce these caps for direct application RPC calls too.
-Existing data is preserved, growth beyond a cap is rejected atomically, and
-deletions or reductions reclaim space. Versions and history are not silently
-discarded. Known errors return `409/storage_limit`. These are logical serialized
-payload budgets, not PostgreSQL physical disk usage; indexes and other database
-overhead are additional. The private AI recovery cache has its own 10 MiB cap.
+The PDF worker has 128 MiB old-generation heap, 16 MiB young generation and
+4 MiB stack limits. RSS is sampled every 50 ms and stops processing above
+512 MiB total or 192 MiB growth. This is best-effort pressure protection, not an
+OS sandbox/hard memory ceiling. Native allocations can grow between samples.
 
-The following migrations were applied through the SQL Editor, not CLI migration
-history entries:
+Shared limits are database-enforced across workers. Failure preserves success
+allowance but retains attempts and known/conservative cost. Cost/attempts use
+the UTC reservation month; successful account allowance uses the UTC completion
+month. Successful generation still counts if a library save or browser delivery
+fails. Changing a cookie, origin or session secret can change guest identity;
+this is not verified one-trial-per-person enforcement.
 
-- `202610160001_landwise_foundation.sql`, SHA-256 `faf3a00d274d7343f382e0ce3cc96acbabd99840db07b8c56bbc7638aade0a9b`.
-- `202610170001_landwise_storage_limits.sql`, SHA-256 `1e59e5ea6ca302335b9ab751e8ee62f6601d1e23de35715101110d6ccbd25634`.
-- `202610170002_landwise_ai_budget.sql`, SHA-256 `8cc558ac4b008579daeb1e1a9458fcff402e7f2a9c67708a173f27ded9665c70`.
+A request UUID binds actor, operation and input. Replays never start new
+inference. Cached results may expire/be evicted, and browser retry IDs are not
+persisted across refresh. Expired cache rows are physically removed on later
+ledger activity, not by a scheduled erasure job. Cost/entitlement history remains.
+Reserved jobs never automatically expire; see the [manual recovery procedure](SUPABASE.md#reconciling-an-interrupted-ai-job).
 
-Verification immediately after migration002 found four quota triggers, zero
-saved applications and zero saved payload bytes. No resumes were uploaded in
-those checks. Anonymous application-list and legacy trial-reservation probes
-returned HTTP 401 / PostgreSQL 42501. After migration003, live verification
-found seven protected ledger tables, five server RPCs, zero browser-callable
-RPCs, all five callable by the service role and zero AI jobs. No resumes or AI
-jobs were created by the migration checks. The project remains on Free.
+## Application storage caps
+
+| Limit | Value |
+| --- | --- |
+| Applications/user | 50 |
+| Versions/application | 10 |
+| Serialized payload/user | 5 MiB |
+| Serialized payload/all users | 100 MiB |
+| History events/application | 100 |
+| Notes/application | 12,000 characters |
+| Practice tasks/application | 100; 1,000-character titles |
+| Saved page target | 1–20 pages |
+
+Triggers also enforce limits for direct RPC writes. Growth beyond a cap is
+rejected; old versions/history are not silently discarded. Deletion/reduction
+reclaims payload quota. These are serialized-data caps, not physical disk
+limits; indexes, auth and ledger tables use additional space. The private
+recovery cache is separate from application payload accounting.
+
+## Applied migrations
+
+These files were applied through the SQL Editor, not recorded in CLI migration
+history. Do not rerun them or use `supabase db push` until that history is
+reconciled. Add new migrations for changes, including removal of legacy trial
+functions. Keep the existing files unchanged.
+
+| File | Applied SHA-256 |
+| --- | --- |
+| `202610160001_landwise_foundation.sql` | `faf3a00d274d7343f382e0ce3cc96acbabd99840db07b8c56bbc7638aade0a9b` |
+| `202610170001_landwise_storage_limits.sql` | `1e59e5ea6ca302335b9ab751e8ee62f6601d1e23de35715101110d6ccbd25634` |
+| `202610170002_landwise_ai_budget.sql` | `8cc558ac4b008579daeb1e1a9458fcff402e7f2a9c67708a173f27ded9665c70` |
+
+Application CRUD uses a verified user's token, never the service-role credential.
+The seven private AI/upload ledger tables and five server-only RPCs are not
+browser-accessible. [Database permissions and setup](SUPABASE.md)
 
 ## Activation procedure
 
-1. Establish and verify a **US$5 provider-side spending stop** for this pilot,
-   leaving US$1 beyond the application's US$4 monthly gate. An alert-only budget
-   is not a hard stop. Disable automatic top-ups/reloads. If an enforceable stop
-   cannot be verified, keep AI disabled; this repository alone does not prove a
-   provider billing ceiling. Recheck model prices and reservation math before
-   activation or any model change.
-2. All three migrations are already applied. Preserve their recorded hashes
-   and role restrictions; do not rerun them. The October 19 protected harness
-   verified concurrent admission through real RPC requests. Repeat equivalent
-   bounded staging checks if changing ledger admission behavior; permission/count
-   verification alone does not replace contention testing.
-3. Configure server-only environment variables from [.env.example](../.env.example):
-   `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `LANDWISE_SESSION_SECRET`, exact
-   `LANDWISE_APP_ORIGIN`, `SUPABASE_URL` and the separate
-   `SUPABASE_PUBLISHABLE_KEY`. Never prefix secrets with `VITE_`, commit them,
-   return them from API routes or put them in browser code. Local account
-   credentials are not required or permitted in the hosted runtime.
-   For deployment compatibility, the exact-case secret name `Supabase_Key` is
-   accepted server-side only when `SUPABASE_SERVICE_ROLE_KEY` is absent. A
-   supplied canonical value always takes precedence, including an invalid or
-   empty value; the same secret/service-role key validation applies to both.
-   Existing write-only secrets under the alias need not be re-entered. Neither
-   name is exposed through public configuration or accepted as the publishable key.
-4. Keep public AI and account sign-in flags false. Build and inspect the hosted
-   artifact, then create a **Vercel-protected, unpromoted staged production
-   deployment** with AI disabled. Verify origin/CSRF enforcement, guest identity,
-   key isolation and database access. Once the spending controls are verified,
-   enable `LANDWISE_HOSTED_AI_ENABLED=true` only on that protected staged
-   deployment for a bounded end-to-end provider test. Promote it to the public
-   domain only after the controls and test pass. The public deployment's AI
-   flag must remain false until that promotion; do not enable public AI merely
-   to perform the activation test.
-5. Keep `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` until custom SMTP or a supported
-   Google OAuth sign-in flow, exact production redirects and real sign-in have
-   been configured and tested. Google OAuth is an alternative configuration
-   task, not a claim that a Google button is already implemented. Then test two
-   accounts for ownership isolation before exposing account sign-in. Guest AI
-   can be enabled separately once its own activation checks pass.
+For a new project, major billing change or reactivation after an incident:
 
-There are no automatic credit purchases, billing fallbacks or retries. Vercel
-and Supabase quotas can still limit availability. Review current provider plans
-before commercial use or increasing limits.
+1. Verify the dedicated provider spending stop, auto-reload OFF, model pricing
+   and reservation math. An alert-only budget is insufficient. Keep public AI
+   disabled until those controls are established.
+2. Verify migrations, service-role access, browser denial and identity/CSRF
+   checks. Production concurrency needs real concurrent RPC verification if
+   admission logic changes; single-connection PGlite tests do not replace it.
+3. Create a Vercel-protected, unpromoted staged deployment from source on Linux,
+   initially with AI disabled. Configure its exact origin appropriately.
+4. Enable AI only on that protected stage for a deliberately bounded synthetic
+   end-to-end request. Check output, failed-job settlement, replay without a
+   second model call, guest allowance and remaining budget. Paid tests consume
+   attempts and credit; do not reset counters to hide them.
+5. Promote only after checks pass. Recheck the public URL and exact production
+   origin. Keep account sign-in disabled until SMTP/redirects, real sign-in,
+   and two-account ownership isolation pass separately.
 
-## Interrupted-job reconciliation
+## Verification history and limits of evidence
 
-Reservations **never expire automatically**. A crashed worker, lost reservation
-response or unavailable settlement RPC can leave the global slot reserved and
-block new AI work. A timeout alone does not prove remote work has stopped.
-Disable admission while investigating and follow the manual
-[reconciliation procedure](./SUPABASE.md#reconciling-an-interrupted-ai-job).
-Never delete a job, reset entitlement counters or release a reservation while
-the original job may still be running. The pilot requires operator monitoring;
-there is no configured alert delivery service.
+October 19 activation: 359 automated tests passed. A real synthetic one-page
+Transform completed in approximately 27 seconds, preserving both experiences
+and their purposes, with one targeted edit and an 88 evidence-match estimate.
+Unsupported Kubernetes experience stayed in the learning report. Committed
+ledger cost was US$0.001754; exact replay returned the same result/cost without
+new inference. Changed-input reuse returned 409; a new request from the used
+guest returned 429. An earlier failed request preserved the guest allowance
+and settled conservatively at US$0.014150. These are ledger amounts, not a
+billing-dashboard reconciliation or a cost-per-resume guarantee.
 
-## Validation and deployment commands
+A protected temporary concurrency harness admitted one of two competing jobs,
+rejected the other as busy, and settled its test reservations at known zero
+provider cost. It was removed; test attempts remained counted. This is evidence
+for the tested race, not every possible database schedule.
 
-Local automated coverage includes PostgreSQL-engine limits/permissions,
-idempotency, costs, guest identity, API requests, provider failure handling and
-UI states. Provider calls in these tests are mocked; they do not verify live
-credentials, billing enforcement, email delivery or multi-session scheduling.
+October 19 typography verification checked 24 UI states across 320, 390, 768
+and 1440px widths using mocked AI results, with no overflow/runtime errors.
+Live desktop/mobile typography and API health were also verified. The build
+still reports a large frontend chunk; code splitting is a future performance
+improvement, not a build failure.
 
-October 19 validation: 359 tests passed, lint passed, and the Vercel/Linux hosted
-build passed. Live provider, ledger and replay results are recorded above.
-October 17 validation also covered all three application builds and an audit
-with zero vulnerabilities. That browser QA used simulated AI responses: one-page
-output, fit report, exhausted guest trial, unavailable account sign-in, and a
-390px viewport with no horizontal overflow. Anonymous probes of all five
-budget/upload RPCs returned 401 / 42501.
-
-```sh
-npm run lint
-npm test
-npm run build
-npm run build:public
-npm run build:hosted
-npm audit
-```
-
-An inspected production artifact can be prepared with
-`vercel build --prod --scope personal-93a7`. Deploy from source on Vercel/Linux
-through a linked Git push or `vercel --prod --scope personal-93a7`; do not upload
-a macOS prebuilt native parser bundle. Linked Git pushes use
-the current `vercel.json`; changing that file can change what the next push
-deploys. The earlier preview's 404 API checks are historical evidence only,
-not validation of the new hosted endpoints.
-
-Keep `.env*` (except the example), `.vercel`, build output and local account files
-out of Git. Never upload `~/.config/landwise/chatgpt.json`.
-
-References: [Vercel Hobby](https://vercel.com/docs/plans/hobby),
-[Supabase cost control](https://supabase.com/docs/guides/platform/cost-control),
-[Supabase setup and recovery](./SUPABASE.md).
+`npm run check:live` does not call OpenAI or test email. Live credentials,
+provider billing settings, email delivery and backup restoration require
+separate checks. See [operations](OPERATIONS.md) for outstanding work.

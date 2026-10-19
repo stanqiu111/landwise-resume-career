@@ -3,7 +3,6 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 process.env.VITE_LANDWISE_HOSTED = 'true';
-process.env.VITE_LANDWISE_PUBLIC_PREVIEW = 'false';
 await build({ build: { outDir: 'dist-hosted', emptyOutDir: true, sourcemap: false } });
 
 // No private server credentials or local account files may reach a browser.

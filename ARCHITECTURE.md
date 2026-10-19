@@ -1,82 +1,159 @@
-# Landwise — Architecture & Workflow
+# Landwise architecture
 
-## Account connection
+There are two server entrypoints and one shared React workspace. The retired
+static coming-soon preview is no longer a third application mode.
 
-The local app uses **Continue with ChatGPT** and an eligible user-authorized plan, without provider API keys. `server/chatgpt-auth.js` implements loopback OAuth, PKCE, verified identity, protected local registration storage, refresh, and sign-out. `server/chatgpt-inference.js` lists the account's models and reads Responses API streams with `store: false`; it returns only completed responses.
+## Runtime boundaries
 
-The API binds to `127.0.0.1`. AI requests require a local session, exact app origin and CSRF header. The browser explicitly starts inference when the user clicks Analyze or Transform. Typing and sign-in never start inference. Account switching, sign-out and Cancel abort ongoing work. A publicly hosted service needs a separately approved integration; see README.
+| Concern | Hosted website | Local studio |
+| --- | --- | --- |
+| Entry | `api/index.js` → `server/hosted-app.js` | `server.js`, loopback only |
+| Frontend | `npm run build:hosted`, `VITE_LANDWISE_HOSTED=true` | Vite dev / `npm run build` |
+| AI | `server/openai-inference.js`, server-funded fixed model | `server/chatgpt-inference.js`, selected authorized ChatGPT model |
+| Identity | Signed guest cookie or verified Supabase account | Local session + ChatGPT connection; optional Supabase account |
+| Allowance/cost | Atomic Supabase private ledger | Local account admission/cooldown and provider plan limits |
+| Application data | Supabase owner-scoped RPCs; no local fallback | Local folders by default; optional Supabase library |
 
-## Input and results
+`server/hosted-app.js` never imports local ChatGPT credentials or account-picker
+routes. Hosted secrets are server-only. `scripts/build-hosted.mjs` scans the
+browser artifact for private credential/local auth references before deployment.
+`vercel.json` routes `/api/:path*` to the hosted entrypoint. The build flag selects
+frontend behavior; it is not a security boundary. Server routes enforce access.
 
-Users paste text or upload a PDF to `POST /api/parse-pdf`. PDF parsing happens locally and returns text plus the original page count, without synthetic page-number markers. A PDF's page count becomes the default output limit. Pasted text is estimated using the standard export layout; the user can adjust the page limit. They add a job description, select an account model and click Transform.
+## Hosted request lifecycle
 
-The result has three tabs: Resume, Fit report and Evidence. The resume is copyable, expandable and downloadable as PDF or DOCX. Exports are generated in the browser. Fit report separates direct evidence present in the draft, transferable evidence to expand, and requirements to learn or substantiate; Evidence shows requirement coverage. Exact final-draft quotes are verified before being displayed as placement evidence.
+1. `hosted-security.js` checks exact origin, signed guest cookie, CSRF token,
+   trusted Vercel IP information, and any supplied Supabase bearer token.
+   An invalid account token never becomes an anonymous guest fallback.
+2. Validate input before admission. `hosted-budget.js` uses the server-only
+   Supabase credential for ledger RPCs. PostgreSQL serializes quota/cost/slot
+   admission; the browser cannot supply its own price or identity.
+3. Bind request UUID to actor, operation and input hash. A repeated admitted
+   request returns cached completion or existing status without fresh inference.
+4. Reserve cost and attempts, then run the shared pipeline under a deadline.
+   Provider failures do not trigger automatic retries. Each sent call is charged
+   conservatively until metered usage is known.
+5. If the verified account has a library, attempt to save the result with its
+   user token. A save failure adds a warning instead of discarding the draft.
+6. Settle cost and success allowance before returning completion. Failures
+   settle without consuming success allowance; attempts/cost are retained.
+   Independent settlement is attempted even after browser cancellation.
 
-## Transform pipeline
+Unknown reservation/settlement state is logged and fails closed. Reserved jobs
+do not expire automatically. A crashed worker can block the single global slot
+until an operator reconciles it. See [recovery](docs/SUPABASE.md#reconciling-an-interrupted-ai-job).
+The limits themselves are documented in [DEPLOYMENT.md](docs/DEPLOYMENT.md);
+change the SQL, adapter constants, tests and docs together when changing policy.
 
-`POST /api/transform` accepts `{ resume, jobDescription, model, maxPages }`. Deterministic input checks reject short or non-text job descriptions and invalid page limits before provider calls.
+## Shared tailoring pipeline
 
 `server/transform.js` normally makes three sequential AI calls:
 
-1. **Combined extraction:** one call validates and analyzes the job description, extracts requirements and extracts resume facts with exact source quotations. Local grounding accepts only quotations present in the original resume; the job description never serves as candidate evidence.
-2. **Matching:** matches job requirements to the verified claim bank. Local checks discard invented claim IDs and unsupported source quotations, and derive coverage from remaining valid matches.
-3. **Targeted editing and coaching:** returns replacements for a limited set of existing bullet IDs and a next step for each requirement, using the full original resume, verified claims, job analysis and locally retrieved relevant sections. `server/resume-edits.js` applies only valid replacements to the original lines; all other lines remain unchanged. At most 35% of bullets rounded up may be edited (minimum one). Empty, multiline, duplicate, non-bullet or substantially expanded replacements are rejected. Metrics must remain in their own original bullet. The model cannot substitute a full rewrite.
+1. Read the resume/job and extract exact quoted claims plus job requirements.
+2. Match requirements against the grounded claim bank. Discard invented IDs or
+   unsupported quotations; the job description is never candidate evidence.
+3. Request small replacements for existing bullet IDs and coaching for each
+   requirement. The full original source and local TF-IDF retrieval provide
+   context without a separate embedding service.
 
-Local final checks reject missing contact details, omitted education and invented numbers. Invalid output produces a visible error rather than an empty success response. Retrieval uses local TF-IDF and makes no external calls.
+`resume-edits.js` applies valid replacements to original lines, preserving all
+other structure. At most 35% of recognized bullets, rounded up with a minimum
+allowance of one, may change. New/deleted/multiline bullets and changed source
+metrics are rejected. Text without recognized bullet markers stays unchanged.
+`resume-quality.js` checks contact/education retention, numeric claims and other
+constraints; these checks do not prove every sentence's semantic truth.
 
-The writer receives the page limit and a source-based word budget. `src/resumeLayout.js` measures the actual wrapped text on Letter pages with 11 pt body text, or a compact 10.5 pt layout. If a draft exceeds the limit, one additional sequential editing call tightens it. The revised draft must pass the same factual and page checks; remaining overflow returns `resume_too_long`. Text is never truncated to fit. Results include the verified `pageCount` and `pageLimit`.
+`src/resumeLayout.js` measures the actual wrapped output on Letter pages with
+readable 10.5–11 pt body text. If too long, Transform permits one additional
+shortening call and checks again; oversized output is rejected, not truncated.
+The hosted adapter caps all calls/job at four. PDF uses the same layout;
+`resumeDocx.js` applies corresponding wrapping and explicit breaks, but Word can
+reflow after edits/font substitution.
 
-PDF export uses the exact same layout calculation as server validation and refuses overflow. DOCX uses the same wrapped lines, page size, margins, fixed line spacing and explicit page breaks. Its pagination is verified in LibreOffice for representative fixtures; changing fonts, editing content or opening it in another word processor can reflow it. The PDF is the fixed-pagination format.
+`tailoring-report.js` derives the score from valid source evidence: must-have
+weight 2, nice-to-have weight 1; direct credit 1, related credit 0.5, absent 0.
+Placement quotations must occur in the final draft. Included, expand and learn
+groups distinguish documented evidence from a skill the user may need to build.
+The score is not an ATS rating or hiring forecast.
 
-The original resume is the only source of candidate facts. Job requirements guide emphasis and never establish candidate experience. Prompts preserve identifying history and prohibit invented skills, achievements and metrics.
+## Revisions and analysis
 
-## Fit report and application library
+`server/revise.js` re-grounds the original source and current draft, validates
+their relationship, and makes one editorial request. Limited replacements must
+preserve source structure/facts and the page target. It regenerates the fit
+report; no automatic shortening/retry pass follows a revision. A changed result
+can save a new version; a no-change result retains the prior saved version.
+The draft carries at most ten recent follow-up exchanges.
 
-`server/tailoring-report.js` calculates a source-evidence score independently of the writer: must-have requirements have weight 2, preferred weight 1; exact evidence earns 1, semantic/transferable evidence 0.5, absent evidence 0. Evidence IDs must exist in the grounded claim bank. Placement quotes must occur in the final draft and have supporting source evidence. Unverified placement remains in the expand group. Coaching is generated in the existing writing request, with local fallback next steps when absent. Scores are not hiring predictions or validated ATS results.
+The UI disables conflicting AI/input actions and preserves the previous result
+and typed follow-up on error. Changing studio source inputs requires a new
+Transform before refining the old draft. Guest Analyze and follow-up are rejected
+by the hosted server, independently of the UI. Authenticated allowance is shared
+across Transform, Analyze and revisions.
 
-`server/application-store.js` stores completed results under `~/Documents/Landwise/Applications`, one local OS-user library, separate from provider credentials. Application snapshots are committed with atomic rename and serialized mutations. Version subfolders contain readable source, JD, draft and report files. SHA-256 of the trimmed exact JD groups versions; an identical retry is idempotent. Metadata includes editable company/role, stage, notes, practice tasks and dated progress changes. Original version inputs and reports never change when progress is updated.
+## Storage and user boundaries
 
-`POST /api/applications/{list,get,save,update,remove}` requires the exact local origin and session CSRF token, including reads. Reading/saving progress requires no selected provider or AI call. The server auto-saves a completed transform before returning its result. A storage failure returns the finished draft plus a save warning; the UI provides retry/export. Folder IDs are validated before path access, files use mode 0600 and created folders use 0700. This is local persistence, not multi-user cloud account isolation or synchronization.
+- `application-store.js`: local folders under the OS user's Documents directory,
+  atomic rename and serialized mutations, owner-only permissions.
+- `cloud-storage.js`: verifies Supabase identity and constructs the correct store.
+- `supabase-applications.js`: application RPCs use the verified **end-user token**,
+  not the service-role credential. Ownership comes from `auth.uid()`; RLS and
+  RPC checks prevent cross-account access. Storage triggers enforce growth caps.
+- The private AI ledger uses the **service-role key**, separately from library
+  CRUD. Cached results may contain sensitive resume/evidence text.
 
-## Follow-up revisions
+Applications group versions by the trimmed exact JD hash. Company/role labels
+and progress can be edited without changing old version snapshots. Guest drafts
+are not automatically placed in a cloud library. Account switches remount the
+workspace and cancel work; same-account token refresh preserves the workspace.
+Supabase SDK sessions persist in browser storage; ChatGPT tokens stay local to
+the loopback server. The account-sign-in feature flag controls public onboarding.
 
-`POST /api/revise` accepts `{ resume, jobDescription, result, instruction, maxPages, model }`. The original source and job are the inputs captured for that completed draft, not newly typed studio fields. The server validates their relationship to the current result, re-grounds its claim bank, and makes one editorial AI request. It applies small bullet edits against the current draft, checks them against the original evidence and immutable structure, validates page count, and rebuilds the fit report. There is no automatic retry or extra shortening request. Errors and overflow leave the prior draft untouched.
+All migrations are applied history, including unused original sponsorship
+functions. Keep them immutable; use a new migration for a future removal.
+See [SUPABASE.md](docs/SUPABASE.md) for table/RPC permissions and retention.
 
-Revision requests share the existing account lock, cooldown, origin/CSRF checks, abort signal and streamed progress. The server deadline is at most 120 seconds; the browser fallback is 135 seconds. The UI keeps the existing preview visible and disables conflicting AI/input actions. Saved versions restore the original input and current draft together. Successful changed revisions auto-save through the existing application store; no-change replies retain the previous save metadata. `revision` contains the request, reply, timestamp and changed flag; `revisionHistory` retains at most ten recent exchanges.
+## Frontend and progress
 
-## Progress, cancellation and diagnosis
+`App.jsx` coordinates state with `useLandwiseAccount`, `useHostedConnection`,
+`useAIConnection` and `useAICooldown`. Components own colocated CSS; shared UI
+font tokens live in `index.css` and workspace rules in `App.css`. The resume
+preview/export has separate typography so UI tuning does not change PDF layout.
 
-The UI requests `Accept: application/x-ndjson`. `server/transform-progress.js` streams actual running/completed/failed stages, elapsed time and five-second heartbeats, followed by one terminal result or error. Other clients can continue receiving a regular JSON response. `src/transformResponse.js` handles fragmented updates, connection interruption and empty results.
+`transform-progress.js` emits real stage events through NDJSON.
+`transformResponse.js` assembles and validates a nonempty result; truncated
+streams are errors. `TransformActivity` maps stages to Read/Match/Build/Check;
+decoration does not advance completion. A light ready sound only runs after
+success, subject to browser audio permission.
 
-The UI does not simulate progress. Analyze and Transform are mutually exclusive. A server guard also prevents overlapping actions from different tabs using the same authenticated account. It displays a Cancel control and persistent errors. A failed retry keeps the previous result and inputs. Expired session errors refresh the connection without reloading the form.
+Uncertain connection failures retain a payload-bound retry ID in memory so an
+unchanged request can recover without duplicate inference. Confirmed terminal
+failure allows a fresh request, subject to attempt limits. Refresh loses unsaved
+state and retry IDs; cached server output alone does not provide a recovery UI.
 
-`server/request-deadline.js` bounds the full operation, including response-body streaming:
+Hosted provider calls have a 60-second deadline; route work has up to 240 seconds
+inside the 300-second Vercel function limit. Local provider calls have a
+120-second deadline. Browser fallback is 250 seconds for Transform and
+135 seconds for revision. Deadlines are upper bounds, not latency promises.
 
-- Each provider inference call: 120 seconds.
-- Entire Transform, including connection and all calls: 240 seconds.
-- Browser fallback deadline: 250 seconds.
+## PDF isolation and events
 
-Deadlines and browser disconnects abort provider work. Provider failures are not retried automatically. The optional length-editing pass stays within the overall deadline. Temporary HTTP or streamed rate limits preserve Retry-After guidance and pause new requests for that account, with a 60-second fallback pause if no delay is supplied. The browser displays a cooldown countdown; it does not retry automatically. Plan allowance exhaustion remains separate and links to ChatGPT Manage usage. These are maximum waits, not promised generation times.
+Hosted PDF uploads use a credential-free worker with heap/RSS pressure checks,
+shared upload admission, and a 10-second deadline. Originals are not stored.
+Local parsing has a different loopback-only path. See deployment caps before
+changing parser limits; native memory checks are not an OS sandbox.
 
-Server logs contain only `transform_step`, `transform_complete` or `transform_failed` events with a request ID, step/status or error code, and elapsed milliseconds. They never contain prompts, resume text, provider output or credentials. The timers cover model discovery, combined extraction, matching, writing, optional shortening and final checks. The animated Read, Match, Build and Check cards follow these events; decorative animation never advances completion.
+`src/data/careerEvents.js` is a curated static directory. Filtering, saved IDs,
+and approximate city-distance sorting run in the browser. Browser geolocation
+is optional; rounded coordinates stay in memory. There is no Maps API key,
+external geocoding request or automatic event scraper.
 
-## Local services and source map
+## Maintenance checks
 
-- React/Vite: `http://127.0.0.1:5174`; proxies `/api` to Express on port 3001.
-- `server.js`: API routes, input validation and request lifecycle.
-- `server/chatgpt-auth.js`: account connection and protected credentials.
-- `server/chatgpt-inference.js`: model discovery and complete response streams.
-- `server/resume-edits.js`, `server/tailoring-report.js`: limited edits and evidence-derived fit feedback.
-- `server/application-store.js`, `src/components/Applications.jsx`: local folders, versions and application progress.
-- `server/transform.js`: sequential extraction, matching and tailoring.
-- `server/transform-progress.js`: stage timing and progress response.
-- `server/request-deadline.js`: cancellation and full-operation deadlines.
-- `server/rag.js`: local resume retrieval.
-- `server/schemas.js`, `server/resume-quality.js`, `server/prompts.js`: evidence and output rules.
-- `src/App.jsx`, `src/transformResponse.js`: request state, progress, cancellation and errors.
-- `src/components/InputPanel.jsx`, `OutputPanel.jsx`: input, preview and exports.
-- `src/resumeLayout.js`, `src/resumeDocx.js`: shared pagination, PDF and Word exports.
-
-## Verification
-
-`npm test` covers authentication, stream assembly, stalled streams after headers, deadline cancellation, sequential extraction, streamed progress, terminal errors, evidence preservation, PDF upload counts, one- and two-page exports, content retention and bounded overflow recovery. `npm run lint` and `npm run build` check the source and browser bundle. Live timing checks use a synthetic resume to avoid retaining personal input in diagnostics.
+`npm run check` runs lint, mocked-provider/PGlite regression tests and both
+builds. Vercel runs the hosted subset on Node 24/Linux before promoting a
+deployment. Run the full check locally before pushing; a separate GitHub Actions
+workflow is not configured. Tests cover permissions, allowances, replay, failure handling,
+source preservation, revisions and pagination. PGlite is single-connection;
+production contention, real credentials, billing controls and email delivery
+need separate bounded checks. Keep synthetic examples out of real user accounts.
