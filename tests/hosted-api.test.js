@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { jsPDF } from 'jspdf';
 import { createHostedApp, hostedAppFromEnvironment } from '../server/hosted-app.js';
 import { createHostedSecurity } from '../server/hosted-security.js';
+import { ACCOUNT_MONTHLY_ACTIONS, GUEST_TAILORINGS } from '../server/hosted-budget.js';
 
 const origin = 'http://127.0.0.1:5174';
 const userId = '11111111-1111-4111-8111-111111111111';
@@ -27,7 +28,7 @@ async function harness(t, options = {}) {
       return store;
     } };
   const budget = {
-    status: async actor => ({ available: true, guestEligible: !actor.userId, remaining: actor.userId ? 3 : 0 }),
+    status: async actor => ({ available: true, guestEligible: !actor.userId, remaining: actor.userId ? ACCOUNT_MONTHLY_ACTIONS : GUEST_TAILORINGS }),
     reserve: async input => {
       events.push('reserve');
       const previous = jobs.get(input.requestId);
@@ -72,6 +73,16 @@ test('guest first transform reserves before inference and settles before result;
   assert.deepEqual(await h.post(), first);
   assert.deepEqual(h.events, ['reserve', 'provider', 'complete', 'reserve']);
   assert.equal([...h.jobs.values()][0].actualCostMicrousd, 1234);
+});
+
+test('the session reports 15 free tailorings for a browser and 3 monthly actions for an account', async t => {
+  const h = await harness(t);
+  const guestSession = await (await fetch(`${h.base}/api/session`)).json();
+  assert.equal(guestSession.authenticated, false);
+  assert.equal(guestSession.limit, 15);
+  const accountSession = await (await fetch(`${h.base}/api/session`, { headers: { Authorization: `Bearer ${token}` } })).json();
+  assert.equal(accountSession.authenticated, true);
+  assert.equal(accountSession.limit, 3);
 });
 
 test('settlement and replay logs contain committed receipt metadata only', async t => {

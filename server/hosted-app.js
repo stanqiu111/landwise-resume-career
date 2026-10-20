@@ -4,7 +4,7 @@ import { parseHostedPDF } from './hosted-pdf.js';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { createCloudStorage } from './cloud-storage.js';
-import { createHostedBudget } from './hosted-budget.js';
+import { ACCOUNT_MONTHLY_ACTIONS, GUEST_TAILORINGS, createHostedBudget } from './hosted-budget.js';
 import { createHostedSecurity } from './hosted-security.js';
 import { createOpenAIInference, HOSTED_AI_JOB_RESERVATION_MICRO_USD } from './openai-inference.js';
 import { transformResume } from './transform.js';
@@ -84,10 +84,11 @@ export function createHostedApp({ security, budget, inference, cloudStorage, ena
   app.get('/api/storage/config', (_req, res) => res.json({ ...(cloudStorage?.publicConfig || { storage: 'unavailable' }), mode: 'hosted', signInEnabled }));
   app.get('/api/session', async (req, res) => {
     try {
-      if (!security) return res.json({ mode: 'hosted', csrfToken: null, available: false, reason: 'configuration', authenticated: false, guestEligible: false, remaining: 0, limit: 3 });
+      if (!security) return res.json({ mode: 'hosted', csrfToken: null, available: false, reason: 'configuration', authenticated: false, guestEligible: false, remaining: 0, limit: GUEST_TAILORINGS });
       const session = security.session(req, res);
       const actor = await security.actor(req);
-      const base = { mode: 'hosted', csrfToken: session.csrfToken, authenticated: Boolean(actor.userId), limit: 3 };
+      const base = { mode: 'hosted', csrfToken: session.csrfToken, authenticated: Boolean(actor.userId),
+        limit: actor.userId ? ACCOUNT_MONTHLY_ACTIONS : GUEST_TAILORINGS };
       if (!ready()) return res.json({ ...base, available: false, reason: 'configuration', guestEligible: false, remaining: 0 });
       const allowance = await budget.status(actor.userId ? { userId: actor.userId } : { guestHash: session.guestHash });
       res.json({ ...allowance, ...base });

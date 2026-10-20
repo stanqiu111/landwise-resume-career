@@ -4,12 +4,13 @@ Updated October 19, 2026. The deployment uses a Supabase Free project.
 The public URL is
 **https://landwise-resume.vercel.app**.
 
-All three migrations, including the hosted AI ledger, are applied remotely.
+The foundation, storage and hosted AI ledger migrations are applied remotely. The
+guest-trial migration is applied separately, after its server deploy (step 3).
 **Guest hosted AI is active** after a live synthetic Transform, committed-cost
 replay, exhausted-trial checks and a protected concurrent-reservation test.
 Both runtime credentials are stored as Vercel Production Secrets; the existing
 `Supabase_Key` name is recognized server-side. Operators must verify provider
-spending controls separately; the application enforces its own US$4/month gate.
+spending controls separately; the application enforces its own US$10/month gate.
 Custom SMTP was OFF at the October 17 check; public email delivery is unverified.
 Keep public account sign-in disabled until its authentication flow is ready.
 See [deployment settings](./DEPLOYMENT.md) and the [operations guide](./OPERATIONS.md).
@@ -52,18 +53,53 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    tables, five server RPCs, zero browser-callable RPCs, five service-role-callable
    RPCs and zero AI jobs. It does not activate AI, fund an API account or configure
    email delivery. No resumes or AI jobs were created by these checks.
-3. Configure exact authentication redirects. Local testing uses
+3. Guest trials: `202610200001_landwise_guest_trials.sql` replaces only the
+   status, reserve and upload functions: 15 successful Transforms per guest
+   cookie for life, 60 attempts/IP/day, 300/day and 3,000/month site-wide, and a
+   US$10 monthly budget. Apply it in this order:
+   1. Raise the OpenAI project's hard spending limit to at least US$11, keep
+      auto-reload OFF, and make sure prepaid credit covers this month.
+   2. Deploy the server from the same commit. Continue only when a fresh
+      `GET https://landwise-resume.vercel.app/api/session` returns `"limit":15`;
+      an older server rejects any status above 3.
+   3. Run the migration file in the SQL Editor right away (it is safe to run twice).
+   4. Check it: `npm run check:live` should report `newGuestRemaining: 15`, and
+      this query should return `true, true, true, false, false, true` for each of
+      the three functions:
+
+      ```sql
+      select p.proname,
+        pg_get_functiondef(p.oid) like '%then 15 else 3 end%'
+          or p.proname = 'landwise_upload_acquire' as guest_15,
+        pg_get_functiondef(p.oid) like '%10000000%'
+          or p.proname = 'landwise_upload_acquire' as budget_10,
+        pg_get_functiondef(p.oid) like '%>= 60 then%'
+          or pg_get_functiondef(p.oid) like '%then 60 else 15%'
+          or p.proname = 'landwise_ai_status' as ip_60,
+        has_function_privilege('anon', p.oid, 'execute') as anon,
+        has_function_privilege('authenticated', p.oid, 'execute') as authenticated,
+        has_function_privilege('service_role', p.oid, 'execute') as service_role
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname in ('landwise_ai_status', 'landwise_ai_reserve', 'landwise_upload_acquire');
+      ```
+
+   5. Record the file's SHA-256 in [DEPLOYMENT.md](DEPLOYMENT.md#applied-migrations).
+
+   To undo, run `supabase/rollbacks/202610200001_landwise_guest_trials_down.sql`
+   in the SQL Editor before restoring any older deployment.
+4. Configure exact authentication redirects. Local testing uses
    `http://127.0.0.1:5174/`; production uses
    `https://landwise-resume.vercel.app/`. Set up and verify custom SMTP for email
    links, or implement/configure and verify a supported Google OAuth flow.
    Leave `LANDWISE_ACCOUNT_SIGN_IN_ENABLED=false` until that work is complete.
-4. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in server configuration.
+5. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in server configuration.
    For the optional local cloud library, also set
    `LANDWISE_APPLICATION_STORAGE=supabase`. The hosted entrypoint always uses
    cloud storage; it never writes local application folders. The public config
    route intentionally returns the publishable key. A legacy `anon` key is
    accepted; secret/service-role keys are rejected in this field.
-5. Hosted AI additionally needs server-only `SUPABASE_SERVICE_ROLE_KEY`,
+6. Hosted AI additionally needs server-only `SUPABASE_SERVICE_ROLE_KEY`,
    `OPENAI_API_KEY` and a stable random `LANDWISE_SESSION_SECRET` of at least
    32 bytes. The existing deployment name `Supabase_Key` (case-sensitive) is
    accepted only as a server-side fallback when `SUPABASE_SERVICE_ROLE_KEY` is
@@ -77,7 +113,7 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    checks in [DEPLOYMENT.md](./DEPLOYMENT.md#activation-procedure). For a fresh activation, paid testing
    must use a Vercel-protected, unpromoted staged production deployment; public
    AI remains disabled until that deployment passes its checks and is promoted.
-6. Before exposing account sign-in, use two real test accounts: save the same
+7. Before exposing account sign-in, use two real test accounts: save the same
    JD in each, verify distinct libraries, and confirm neither can read, edit or
    delete the other's application ID. Account switches must clear the studio
    and cancel in-flight work; a same-account token refresh must preserve it.
@@ -86,7 +122,7 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
 
 Hosted AI uses the application's server-funded OpenAI API key. It does not use
 visitors' ChatGPT plans or the owner's local ChatGPT credentials. A signed guest
-cookie permits one successful Transform; verified accounts permit three
+cookie permits fifteen successful Transforms for life; verified accounts permit three
 successful AI jobs per UTC month across Transform, Analyze and follow-up.
 Guest Analyze/follow-up require sign-in. Cookies cannot establish one human:
 clearing or expiring a cookie, using incognito or another browser creates another
@@ -94,9 +130,9 @@ identity. Guest quota hashes depend on the session secret, which must remain
 stable across deployments. A guest's successful result is downloadable and may
 be cached for recovery, but is not automatically saved to an account library.
 
-The service reserves US$0.06 before inference against a US$4 monthly application
-budget. It admits at most one global active job, 10 attempts/day, 100/month and
-3 attempts/IP/day. Failures keep the success allowance but still count as
+The service reserves US$0.06 before inference against a US$10 monthly application
+budget. It admits at most one global active job, 300 attempts/day, 3,000/month and
+60 attempts/IP/day. Failures keep the success allowance but still count as
 attempts and spending. Known provider usage settles cost; uncertain sent calls
 are conservatively estimated, and unknown total cost keeps the full reservation.
 Provider usage comes only from the trusted server, never client claims.
@@ -110,7 +146,7 @@ inside the 300-second function limit, with remaining time reserved for save and
 settlement. The adapter has no automatic provider retry. Verify auto-reload is
 OFF and a provider hard spending stop is enabled before activation.
 An alert-only budget is insufficient.
-Keep the separate US$4 application gate and recheck billing controls before
+Keep the separate US$10 application gate and recheck billing controls before
 reactivation or model/budget changes. See the [operations guide](OPERATIONS.md).
 
 The AI migration exposes only these server-role RPCs:
@@ -138,8 +174,8 @@ PDF parsing accepts one file up to 2 MiB, 1–20 pages and 30,000 extracted
 characters, in a credential-free worker with a 10-second deadline and at most
 one worker per process. Heap and best-effort RSS limits are documented in
 [deployment limits](./DEPLOYMENT.md#hosted-limits).
-Upload admission allows 100 attempts/day globally, 10/IP/day and
-10/guest/day. These counters use UTC, retain the current and previous two days
+Upload admission allows 300 attempts/day globally, 60/IP/day and
+15/guest/day. These counters use UTC, retain the current and previous two days
 on subsequent upload admission, and contain no uploaded content. They do not
 consume AI attempt budgets.
 
@@ -190,7 +226,7 @@ must contain identifiers only, not actor identities, resume/JD text or secrets.
    select public.landwise_ai_fail('REPLACE_WITH_CONFIRMED_JOB_UUID'::uuid, null);
    ```
 
-   This preserves the first-success/monthly success allowance, but does not
+   This preserves the guest lifetime or account monthly success allowance, but does not
    refund attempts or the reserved cost. A repeat settlement preserves the
    recorded completed/failed state. Never delete the job, reset cost/entitlement
    counters or enter zero cost merely because usage is unknown.

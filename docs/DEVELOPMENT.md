@@ -28,10 +28,11 @@ setup and testing.
 | GitHub | Source and production deployments from `main` |
 
 Visitors are not charged by Landwise. **Operating AI is not free for the owner.**
-The application currently gates new work at US$4 per UTC month, 10 global
-attempts/day, 100/month, 3/IP/day, and one active job globally. Each job reserves
-US$0.06 before making provider calls. A guest gets one successful Transform per
-signed browser-cookie identity, not per proven human. Clearing cookies or using
+The application currently gates new work at US$10 per UTC month, 300 global
+attempts/day, 3,000/month, 60/IP/day, and one active job globally. Each job
+reserves US$0.06 before making provider calls. A guest gets 15 successful
+Transforms for life per signed browser-cookie identity, not per proven human;
+after that the app links to the local version. Clearing cookies or using
 another browser can create another identity; the shared limits still apply.
 
 Operators must separately verify a provider spending stop and keep auto-reload
@@ -47,7 +48,7 @@ before promoting the site more widely.
 ## Development and validation
 
 Use Node **24.x** (the production runtime and `.nvmrc` recommendation).
-The package also supports Node 22.12+; dependencies are locked in
+The package also supports Node 22.12 to 24.x; dependencies are locked in
 `package-lock.json`.
 
 ```sh
@@ -109,7 +110,8 @@ src/
   careerEvents.js, careerLocation.js
                                 Event filtering, distance sorting and in-memory location
   data/careerEvents.js          Curated source-linked event directory
-supabase/migrations/            Immutable, already-applied database history
+supabase/migrations/            Immutable database history, applied in order
+supabase/rollbacks/             Undo scripts for a migration; never applied automatically
 scripts/                        Security, build, cleanup and live-check commands
 .githooks/                      Local commit and push guards (enable with security:setup)
 tests/                          Synthetic fixtures and automated regression tests

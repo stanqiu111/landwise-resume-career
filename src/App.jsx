@@ -268,7 +268,7 @@ function Workspace({ account, connection, hosted = false, guestDraft, onPrepareG
       if (hosted) {
         connection.recordFailure(err);
         hostedRequestIds.failed('transform', err, { aborted: controller.signal.aborted });
-        if (['guest_limit', 'sign_in_required', 'cloud_sign_in_required'].includes(err.code) || (err.code === 'hosted_ai_allowance_used' && !account.user)) setShowAccount(true);
+        if (account.signInEnabled && (['guest_limit', 'sign_in_required', 'cloud_sign_in_required'].includes(err.code) || (err.code === 'hosted_ai_allowance_used' && !account.user))) setShowAccount(true);
       }
       if (controller.signal.aborted) {
         message = controller.signal.reason?.name === 'TimeoutError'
@@ -461,7 +461,7 @@ function Workspace({ account, connection, hosted = false, guestDraft, onPrepareG
                       {loading ? <span className="transform-busy"><span className="spinner" /> Tailoring your resume…</span> : <>{cooldown.retryIn > 0 ? `Try again in ${cooldown.retryIn}s` : retryHostedTransform ? 'Retry my last tailoring' : 'Tailor my resume'}{!hosted && <span aria-hidden="true">↗</span>}</>}
                     </button>
                     {loading && <button className="cancel-transform" onClick={() => transformRequestRef.current?.abort()}>Cancel tailoring</button>}
-                    <p className="transform-note">{hosted ? account.user ? 'Keeps your roles and projects. Completed drafts save to your application library.' : account.signInEnabled ? 'Keeps your roles and projects. Download your first draft, or create a free account to save it.' : 'Keeps your roles and projects. Download your first draft; account saving is coming soon.' : account.cloud && !account.user ? 'Sign in to Landwise above, then connect your ChatGPT plan to tailor a resume.' : `Keeps your roles and projects. Saves completed drafts in My applications ${account.cloud ? 'in your Landwise account' : 'on this computer'}.`}</p>
+                    <p className="transform-note">{hosted ? account.user ? 'Keeps your roles and projects. Completed drafts save to your application library.' : account.signInEnabled ? 'Keeps your roles and projects. Download each draft, or create a free account to save it.' : 'Keeps your roles and projects. Download each draft before leaving; nothing is saved to an account.' : account.cloud && !account.user ? 'Sign in to Landwise above, then connect your ChatGPT plan to tailor a resume.' : `Keeps your roles and projects. Saves completed drafts in My applications ${account.cloud ? 'in your Landwise account' : 'on this computer'}.`}</p>
                   </div>
                 </>}
               </InputPanel>

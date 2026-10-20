@@ -4,6 +4,37 @@ The local studio uses the user's authorized ChatGPT plan and a loopback server.
 Production uses a different, API-funded server. Changes to one integration do
 not establish that the other works.
 
+<!-- Linked from the live site (LOCAL_SETUP_URL in src/hostedAccess.js) and the README. Keep this heading text. -->
+## Run Landwise on your computer
+
+Use this after your 15 free tailorings on the live site. It runs on your own
+computer and uses your ChatGPT account instead of Landwise's credits.
+
+1. Install [Node.js](https://nodejs.org/) 24 and [Git](https://git-scm.com/).
+   Node 22 also works; Node 25 and newer aren't supported yet. `node --version`
+   should print v24 or v22.
+2. Download Landwise and install its packages:
+
+   ```sh
+   git clone https://github.com/stanqiu111/landwise-resume-career.git
+   cd landwise-resume-career
+   npm ci
+   ```
+
+3. Start it with `npm run dev`.
+4. Open **http://127.0.0.1:5174** in your browser. Use exactly that address,
+   not `localhost`: from any other address, Landwise refuses ChatGPT sign-in and
+   tailoring.
+5. Click **Continue with ChatGPT**, sign in, and choose a model. OpenAI decides
+   which plans can sign in, and your plan's own usage limits apply.
+
+Saved applications are stored in `Documents/Landwise/Applications`, and your
+ChatGPT sign-in in `~/.config/landwise` (see Credentials and saved work below).
+AI requests go to OpenAI through your ChatGPT account. Press `Ctrl+C` in the
+terminal to stop Landwise. To update, stop it, run `git pull` and `npm ci`, then
+`npm run dev` again. "Port 5174 is already in use" means Landwise is already
+running in another terminal.
+
 ## Start and stop
 
 Use Node 24 (`nvm use` if nvm is installed), then:
@@ -13,6 +44,9 @@ npm ci
 npm run security:setup
 npm run dev
 ```
+
+`npm run security:setup` installs the commit and push secret checks. Contributors
+need it; people who only run Landwise can skip it.
 
 Open **http://127.0.0.1:5174**. `vite.config.js` proxies `/api` to
 **127.0.0.1:3001**. Keep the exact host for the OAuth callback. `Ctrl+C` stops

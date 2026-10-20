@@ -5,8 +5,8 @@
 .hosted-access p.hosted-access-detail { color: #6b778b; font-size: var(--text-xs); }
 .hosted-access p.hosted-access-error { padding: 10px; border-radius: 4px; background: #fff1f3; color: #8d2f35; }
 .hosted-access-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.hosted-access-actions button, .hosted-header-account, .hosted-handoff button { min-height: 36px; padding: 8px 11px; border: 1px solid #d5deef; border-radius: 5px; background: #fff; color: #3b5797; font-size: var(--text-xs); line-height: 1.5; text-decoration: none; cursor: pointer; }
-.hosted-access-actions button:hover, .hosted-header-account:hover, .hosted-handoff button:hover { background: #eef3ff; }
+.hosted-access-actions button, .hosted-access-actions a, .hosted-header-account, .hosted-handoff button { min-height: 36px; padding: 8px 11px; border: 1px solid #d5deef; border-radius: 5px; background: #fff; color: #3b5797; font-size: var(--text-xs); line-height: 1.5; text-decoration: none; cursor: pointer; }
+.hosted-access-actions button:hover, .hosted-access-actions a:hover, .hosted-header-account:hover, .hosted-handoff button:hover { background: #eef3ff; }
 .hosted-handoff { margin-bottom: 25px; padding: 20px; border: 1px solid #ccd9f5; border-radius: 7px; background: #f5f8ff; }
 .hosted-handoff h2 { margin: 0 0 8px; font-size: var(--text-lead); line-height: 1.5; }
 .hosted-handoff p { margin: 0 0 12px; color: #5e6e89; font-size: var(--text-sm); line-height: 1.7; }

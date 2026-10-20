@@ -27,7 +27,7 @@ students.
 
 ### [🌐 Try it at landwise-resume.vercel.app](https://landwise-resume.vercel.app)
 
-One free tailoring per browser: no account, no email, no API key.<br>
+15 free tailorings per browser: no account, no email, no API key.<br>
 <sub>Screenshots show an invented student and job from a scripted demo run, so
 real timings may differ.</sub>
 
@@ -81,14 +81,14 @@ every gap.
   calendars in a few Canadian and US cities, each linked to the organizer's own
   page and sorted by distance if you share your location.
   [More below ↓](#career-events)
-- 🆓 **Free to try** — on the live site you get one free tailoring per browser,
-  with no account, email or API key, and Landwise doesn't charge visitors. If a
-  run fails, you keep your free tailoring, but every try counts toward small
-  daily limits.
-- 💻 **Or use your own ChatGPT plan** — if you're comfortable running a Node.js
-  project, a local version on your computer signs in with your ChatGPT account,
-  where OpenAI allows it for your plan. No API key is needed, and your plan's
-  own usage limits apply. [Local setup →](docs/LOCAL_DEVELOPMENT.md)
+- 🆓 **Free to try** — on the live site you get 15 free tailorings per browser,
+  with no account, email or API key, and Landwise doesn't charge visitors. A
+  failed run doesn't use one up, but every try counts toward the site's limits.
+- 💻 **Then use your own ChatGPT plan** — after your 15 free tailorings, run
+  Landwise on your own computer. It signs in with your ChatGPT account, where
+  OpenAI allows it for your plan. No API key is needed, and your plan's own
+  usage limits apply.
+  [Run it on your computer →](docs/LOCAL_DEVELOPMENT.md#run-landwise-on-your-computer)
 
 ## How a tailoring works
 
@@ -150,8 +150,8 @@ that fits the role. No account needed.
   refresh or close the tab, and it isn't an account library or a backup. It
   stops being recoverable after 7 days and is removed during later site
   activity.
-- **A cookie**, kept for a year, lets Landwise know when you've used your free
-  tailoring.
+- **A cookie**, kept for a year, lets Landwise count how many of your free
+  tailorings you've used.
 - **Uploaded PDFs** are read in memory and never written to disk.
 - **Server logs** record steps, timings and status codes, never your resume or
   job description.
@@ -173,10 +173,11 @@ that fits the role. No account needed.
   with a long job posting, even though the app accepts up to 30,000
   characters. If tailoring a long resume fails, shorten the resume or the job
   posting and try again.
-- Only one tailoring runs at a time on the live site, and there are small daily
-  limits for the whole site and for each internet connection, so a shared
-  campus network can run out sooner. Every try counts, even one that fails. If
-  you hit a limit, try again later, which can mean tomorrow.
+- Only one tailoring runs at a time on the live site. Each internet connection
+  gets 60 tries a day, shared by everyone on it, and the whole site gets 300 a day
+  and 3,000 a month within a monthly budget. Every try counts, even one that
+  fails. If you hit a limit, try again later, which can mean tomorrow or next
+  month, or run Landwise on your own computer.
 
 ## Coming soon
 

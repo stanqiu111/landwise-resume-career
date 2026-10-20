@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+// Must match supabase/migrations/202610200001_landwise_guest_trials.sql.
+export const GUEST_TAILORINGS = 15;
+export const ACCOUNT_MONTHLY_ACTIONS = 3;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HASH = /^[a-f0-9]{64}$/;
 const Actor = z.object({ userId: z.string().regex(UUID).optional(), guestHash: z.string().regex(HASH).optional() })
@@ -15,10 +19,10 @@ const fail = (message, status = 503, code = 'hosted_budget_unavailable') => Obje
 const errors = new Map([
   ['landwise_upload_limit', [429, 'upload_limit', 'The daily PDF upload limit has been reached. Paste your resume text or try again tomorrow.']],
   ['landwise_ai_busy', [409, 'hosted_ai_busy', 'Another AI request is running or awaiting recovery. Please try again later.']],
-  ['landwise_ai_allowance_used', [429, 'hosted_ai_allowance_used', 'Your sponsored AI allowance has been used. Sign in to check your monthly allowance.']],
-  ['landwise_ai_budget_limit', [429, 'hosted_ai_budget_limit', 'The pilot AI budget has been reached for this month. Your inputs are still available.']],
-  ['landwise_ai_daily_limit', [429, 'hosted_ai_daily_limit', 'The pilot daily AI request limit has been reached. Please try again tomorrow.']],
-  ['landwise_ai_monthly_limit', [429, 'hosted_ai_monthly_limit', 'The pilot monthly AI request limit has been reached. Please try again next month.']],
+  ['landwise_ai_allowance_used', [429, 'hosted_ai_allowance_used', 'Your free AI allowance has been used.']],
+  ['landwise_ai_budget_limit', [429, 'hosted_ai_budget_limit', 'The AI budget has been reached for this month. Your inputs are still available.']],
+  ['landwise_ai_daily_limit', [429, 'hosted_ai_daily_limit', 'The daily AI request limit has been reached. Please try again tomorrow.']],
+  ['landwise_ai_monthly_limit', [429, 'hosted_ai_monthly_limit', 'The monthly AI request limit has been reached. Please try again next month.']],
   ['landwise_ai_ip_limit', [429, 'hosted_ai_ip_limit', 'The daily AI request limit for this connection has been reached. Please try again tomorrow.']],
   ['landwise_ai_idempotency_conflict', [409, 'hosted_ai_idempotency_conflict', 'This request ID belongs to different inputs. Start a new request for these changes.']],
   ['landwise_ai_sign_in_required', [401, 'cloud_sign_in_required', 'Sign in to your Landwise account to use analysis and follow-up editing.']],
@@ -79,7 +83,8 @@ export function createHostedBudget({ url, serviceRoleKey, fetchImpl = globalThis
       return rpc('landwise_upload_acquire', { p_guest_hash: value.guestHash, p_ip_hash: value.ipHash }, data => data === true);
     },
     status: async actor => rpc('landwise_ai_status', actorArgs(parse(Actor, actor)), data => object(data)
-      && typeof data.guestEligible === 'boolean' && Number.isInteger(data.remaining) && data.remaining >= 0 && data.remaining <= 3 && typeof data.available === 'boolean'),
+      && typeof data.guestEligible === 'boolean' && Number.isInteger(data.remaining) && data.remaining >= 0
+      && data.remaining <= (actor.userId ? ACCOUNT_MONTHLY_ACTIONS : GUEST_TAILORINGS) && typeof data.available === 'boolean'),
     reserve: async input => {
       const value = parse(Reserve, input);
       return rpc('landwise_ai_reserve', { ...actorArgs(value), p_request_id: value.requestId, p_ip_hash: value.ipHash,

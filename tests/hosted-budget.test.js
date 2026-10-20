@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHostedBudget } from '../server/hosted-budget.js';
+import { readFile } from 'node:fs/promises';
+import { ACCOUNT_MONTHLY_ACTIONS, GUEST_TAILORINGS, createHostedBudget } from '../server/hosted-budget.js';
 
 const id = '11111111-1111-4111-8111-111111111111';
 const config = { url: 'https://example.supabase.co', serviceRoleKey: 'sb_secret_private_test' };
@@ -34,6 +35,20 @@ test('server-only adapter uses exact RPCs and preserves actor-bound idempotency/
     assert.equal(call.redirect, 'error');
     assert.ok(call.signal instanceof AbortSignal);
   }
+});
+
+test('status accepts each actor’s real allowance and rejects anything larger', async () => {
+  const statusWith = (actor, remaining) => createHostedBudget({ ...config,
+    fetchImpl: async () => response({ guestEligible: !actor.userId && remaining > 0, remaining, available: true }) }).status(actor);
+  assert.equal((await statusWith({ guestHash: guest }, GUEST_TAILORINGS)).remaining, 15);
+  await assert.rejects(statusWith({ guestHash: guest }, GUEST_TAILORINGS + 1), error => error.code === 'hosted_budget_unavailable');
+  assert.equal((await statusWith({ userId: id }, ACCOUNT_MONTHLY_ACTIONS)).remaining, 3);
+  await assert.rejects(statusWith({ userId: id }, ACCOUNT_MONTHLY_ACTIONS + 1), error => error.code === 'hosted_budget_unavailable');
+});
+
+test('the server allowance constants match the ledger migration', async () => {
+  const sql = await readFile(new URL('../supabase/migrations/202610200001_landwise_guest_trials.sql', import.meta.url), 'utf8');
+  assert.equal((sql.match(new RegExp(`then ${GUEST_TAILORINGS} else ${ACCOUNT_MONTHLY_ACTIONS} end`, 'g')) || []).length, 2);
 });
 
 test('unsafe keys, malformed identity/hash/cost requests never reach the network', async () => {

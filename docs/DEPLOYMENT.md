@@ -51,7 +51,8 @@ The public storage-config response intentionally includes the publishable key.
 
 The hosted service uses operator-funded API credits. Verify a provider spending
 stop and disable auto-reload in the provider dashboard; those settings are not
-configured by this repository. The app separately gates admission at US$4/month.
+configured by this repository. The app separately gates admission at US$10/month;
+keep the provider spending stop at least US$1 higher (US$11 or more).
 Keep these distinct; failed requests can still incur cost and provider enforcement is not instantaneous.
 [Spend-limit behavior](https://developers.openai.com/api/docs/guides/spend-limits)
 
@@ -59,12 +60,12 @@ Keep these distinct; failed requests can still incur cost and provider enforceme
 
 | Limit | Value |
 | --- | --- |
-| Monthly application AI budget | US$4 per UTC month, including active reservations |
+| Monthly application AI budget | US$10 per UTC month, including active reservations |
 | Reservation/job | US$0.06 (60,000 microUSD) |
-| Global attempts | 10 per UTC day; 100 per UTC month |
-| Attempts/trusted IP hash | 3 per UTC day |
+| Global attempts | 300 per UTC day; 3,000 per UTC month |
+| Attempts/trusted IP hash | 60 per UTC day (shared campus and dorm networks) |
 | Global active jobs | 1 |
-| Guest allowance | 1 successful Transform per cookie identity |
+| Guest allowance | 15 successful Transforms per cookie identity, for life; then the app links to the local version |
 | Verified-account allowance | 3 successful AI actions per UTC month, across Transform/Analyze/revise |
 | Provider calls | At most 4/job; no automatic retries |
 | Provider request/output | 60,000 UTF-8 bytes serialized input; 12,000 output tokens/call |
@@ -73,7 +74,7 @@ Keep these distinct; failed requests can still incur cost and provider enforceme
 | HTTP AI payload | 60,000 UTF-8 bytes; resume up to 30,000 chars; JD 50–20,000 chars |
 | Follow-up instruction | Up to 2,000 chars |
 | Hosted PDF | One file up to 2 MiB, 1–20 pages, up to 30,000 extracted chars |
-| PDF upload admission | 100/day globally; 10/IP/day; 10/guest/day |
+| PDF upload admission | 300/day globally; 60/IP/day; 15/guest/day |
 | PDF worker | Credential-free; 10-second deadline; one worker/process |
 | Recovery cache | 220,000 serialized UTF-8 bytes/job; 10 MiB total; up to 7 days, earlier eviction when full |
 
@@ -87,7 +88,7 @@ allowance but retains attempts and known/conservative cost. Cost/attempts use
 the UTC reservation month; successful account allowance uses the UTC completion
 month. Successful generation still counts if a library save or browser delivery
 fails. Changing a cookie, origin or session secret can change guest identity;
-this is not verified one-trial-per-person enforcement.
+this is not verified per-person enforcement.
 
 A request UUID binds actor, operation and input. Replays never start new
 inference. Cached results may expire/be evicted, and browser retry IDs are not
@@ -126,6 +127,7 @@ functions. Keep the existing files unchanged.
 | `202610160001_landwise_foundation.sql` | `faf3a00d274d7343f382e0ce3cc96acbabd99840db07b8c56bbc7638aade0a9b` |
 | `202610170001_landwise_storage_limits.sql` | `1e59e5ea6ca302335b9ab751e8ee62f6601d1e23de35715101110d6ccbd25634` |
 | `202610170002_landwise_ai_budget.sql` | `8cc558ac4b008579daeb1e1a9458fcff402e7f2a9c67708a173f27ded9665c70` |
+| `202610200001_landwise_guest_trials.sql` | Pending: apply after the server deploy ([SUPABASE.md](SUPABASE.md) migration step 3) |
 
 Application CRUD uses a verified user's token, never the service-role credential.
 The seven private AI/upload ledger tables and five server-only RPCs are not

@@ -32,8 +32,19 @@ before(async () => {
     revoke all on schema landwise_private from public,anon,authenticated,service_role;
     alter default privileges in schema public grant execute on functions to anon,authenticated,service_role;`);
   await query('insert into auth.users(id) values ($1),($2)', [user, otherUser]);
-  await db.exec(await readFile(new URL('../supabase/migrations/202610170002_landwise_ai_budget.sql', import.meta.url), 'utf8'));
+  // Production state: the original ledger, then the guest-trial limits on top.
+  for (const migration of ['202610170002_landwise_ai_budget.sql', '202610200001_landwise_guest_trials.sql']) {
+    await db.exec(await readFile(new URL(`../supabase/migrations/${migration}`, import.meta.url), 'utf8'));
+  }
 });
+const setCounter = async (table, attempts) => {
+  await as('postgres');
+  const column = table === 'landwise_ai_days' ? 'day' : 'month';
+  const value = table === 'landwise_ai_days' ? 'current_date' : "date_trunc('month', current_date)::date";
+  await query(`insert into landwise_private.${table}(${column}, attempts) values (${value}, $1)
+    on conflict (${column}) do update set attempts = excluded.attempts`, [attempts]);
+  await as('service_role');
+};
 beforeEach(async () => {
   await as('postgres');
   await db.exec(`truncate landwise_private.landwise_ai_jobs,landwise_private.landwise_ai_months,
@@ -53,7 +64,7 @@ test('only service-role RPCs may reserve, settle, read status or acquire upload 
   }
   await as('service_role');
   await assert.rejects(query('select * from landwise_private.landwise_ai_jobs'), error => error.code === '42501');
-  assert.deepEqual(await status(), { guestEligible: true, remaining: 1, available: true });
+  assert.deepEqual(await status(), { guestEligible: true, remaining: 15, available: true });
   const receipt = await reserve();
   assert.equal(receipt.admitted, true);
   assert.ok(!JSON.stringify(receipt).includes(guest));
@@ -86,23 +97,31 @@ test('failures keep entitlement but count attempts and charge actual or whole un
   const failed = await failure(first);
   assert.equal(failed.status, 'failed');
   assert.equal(failed.chargedCostMicrousd, 60000);
-  assert.equal((await status()).remaining, 1);
+  assert.equal((await status()).remaining, 15);
   const second = await reserve();
   await failure(second, 13625);
-  const third = await reserve();
-  await failure(third, 0);
+  for (let index = 2; index < 15; index++) await failure(await reserve(), 0);
+  assert.equal((await status()).remaining, 15, 'failed attempts never use up a free tailoring');
+  await as('postgres');
+  await query('update landwise_private.landwise_ai_ip_days set attempts = 59 where ip_hash = $1', [ip]);
+  await as('service_role');
+  await failure(await reserve(), 0);
   await rejects(reserve(), 'landwise_ai_ip_limit');
+  assert.equal((await reserve({ ipHash: hash('another-connection') })).admitted, true, 'the limit is per connection');
   await as('postgres');
   const monthly = (await query('select attempts,committed_microusd from landwise_private.landwise_ai_months')).rows[0];
-  assert.equal(monthly.attempts, 3);
-  assert.equal(Number(monthly.committed_microusd), 73625);
+  assert.equal(monthly.attempts, 17);
+  assert.equal(Number(monthly.committed_microusd), 133625);
 });
 
-test('a guest gets one lifetime successful transform and signed users get three successful monthly jobs', async () => {
+test('a guest gets fifteen lifetime successful transforms and signed users get three successful monthly jobs', async () => {
   await rejects(reserve({ operation: 'analyze' }), 'landwise_ai_sign_in_required');
+  for (let index = 0; index < 14; index++) await complete(await reserve(), 1000);
+  assert.deepEqual(await status(), { guestEligible: true, remaining: 1, available: true });
   await complete(await reserve(), 1000);
   assert.deepEqual(await status(), { guestEligible: false, remaining: 0, available: false, reason: 'guest_trial_used' });
   await rejects(reserve({ ipHash: hash('new-ip') }), 'landwise_ai_allowance_used');
+  assert.equal((await status(null, hash('a-new-browser'))).remaining, 15);
   for (const operation of ['transform', 'revise', 'analyze']) {
     await complete(await reserve({ userId: user, operation, ipHash: hash(operation) }), 1000);
   }
@@ -117,8 +136,11 @@ test('a guest gets one lifetime successful transform and signed users get three 
   assert.equal((await status()).remaining, 0);
 });
 
-test('the monthly US$4 boundary reserves worst case first, then blocks further spending', async () => {
-  const first = await reserve({ maxCostMicrousd: 3940000 });
+test('the monthly US$10 boundary reserves worst case first, then blocks further spending', async () => {
+  await as('postgres');
+  await query("insert into landwise_private.landwise_ai_months(month, committed_microusd) values (date_trunc('month', current_date)::date, 9880000)");
+  await as('service_role');
+  const first = await reserve();
   await failure(first);
   const last = await reserve();
   assert.equal(last.admitted, true);
@@ -126,13 +148,18 @@ test('the monthly US$4 boundary reserves worst case first, then blocks further s
   await rejects(reserve({ maxCostMicrousd: 1 }), 'landwise_ai_budget_limit');
   assert.equal((await status()).reason, 'monthly_budget');
   await as('postgres');
-  assert.equal(Number((await query('select committed_microusd from landwise_private.landwise_ai_months')).rows[0].committed_microusd), 4000000);
+  assert.equal(Number((await query('select committed_microusd from landwise_private.landwise_ai_months')).rows[0].committed_microusd), 10000000);
+});
+
+test('the per-job reservation ceiling stays at US$4', async () => {
+  await assert.rejects(reserve({ maxCostMicrousd: 4000001 }), error => error.code === '22023');
+  assert.equal((await reserve({ maxCostMicrousd: 4000000 })).admitted, true);
 });
 
 test('actual overrun is recorded rather than hidden and settlement is idempotent', async () => {
   const job = await reserve();
-  const settled = await complete(job, 4000001);
-  assert.equal(settled.chargedCostMicrousd, 4000001);
+  const settled = await complete(job, 10000001);
+  assert.equal(settled.chargedCostMicrousd, 10000001);
   assert.deepEqual(await failure(job, 0), settled);
   assert.deepEqual(await complete(job, 0), settled);
   await rejects(reserve({ guestHash: hash('another-guest'), ipHash: hash('another-ip') }), 'landwise_ai_budget_limit');
@@ -140,17 +167,19 @@ test('actual overrun is recorded rather than hidden and settlement is idempotent
   assert.equal((await query('select successful_jobs from landwise_private.landwise_ai_entitlements')).rows[0].successful_jobs, 1);
 });
 
-test('ten global daily attempts and 100 monthly attempts count failures and reject admission atomically', async () => {
-  for (let index = 0; index < 10; index++) await failure(await reserve({ ipHash: hash(`ip-${index}`) }), 0);
-  await rejects(reserve({ ipHash: hash('ip-11') }), 'landwise_ai_daily_limit');
-  await as('postgres');
-  await query('update landwise_private.landwise_ai_days set attempts=0');
-  await query('update landwise_private.landwise_ai_months set attempts=99');
-  await as('service_role');
+test('300 global daily attempts and 3,000 monthly attempts count failures and reject admission atomically', async () => {
+  for (let index = 0; index < 3; index++) await failure(await reserve({ ipHash: hash(`ip-${index}`) }), 0);
+  await setCounter('landwise_ai_days', 299);
+  await failure(await reserve({ ipHash: hash('last-of-the-day') }), 0);
+  await rejects(reserve({ ipHash: hash('one-too-many-today') }), 'landwise_ai_daily_limit');
+  assert.equal((await status(null, hash('someone-new'))).reason, 'daily_limit');
+  await setCounter('landwise_ai_days', 0);
+  await setCounter('landwise_ai_months', 2999);
   await failure(await reserve({ ipHash: hash('new-month-boundary-ip') }), 0);
   await rejects(reserve({ ipHash: hash('new-month-boundary-ip2') }), 'landwise_ai_monthly_limit');
+  assert.equal((await status(null, hash('someone-new'))).reason, 'monthly_limit');
   await as('postgres');
-  assert.equal((await query('select attempts from landwise_private.landwise_ai_months')).rows[0].attempts, 100);
+  assert.equal((await query('select attempts from landwise_private.landwise_ai_months')).rows[0].attempts, 3000);
   assert.equal((await query('select attempts from landwise_private.landwise_ai_days')).rows[0].attempts, 1);
 });
 
@@ -174,7 +203,7 @@ test('expired or oversized cached results never restore allowance or cause repla
   const oversized = await reserve({ requestId });
   assert.equal(oversized.resultUnavailable, true);
   assert.equal(oversized.admitted, false);
-  assert.equal((await status()).remaining, 0);
+  assert.equal((await status()).remaining, 14);
   const secondRequest = randomUUID();
   const signed = await reserve({ requestId: secondRequest, userId: user, ipHash: hash('signed-ip') });
   await complete(signed, 500, { output: 'recoverable' });
@@ -210,19 +239,24 @@ test('durable recovery results stay under 10 MiB by evicting oldest cache entrie
 
 test('PDF quotas are independent, atomic, scoped by guest/IP and retain only three days', async () => {
   const upload = (guestHash = guest, ipHash = ip) => rpc('landwise_upload_acquire', [guestHash, ipHash]);
-  for (let index = 0; index < 10; index++) assert.equal(await upload(), true);
+  for (let index = 0; index < 15; index++) assert.equal(await upload(), true);
   await rejects(upload(), 'landwise_upload_limit');
-  await rejects(upload(hash('new-guest')), 'landwise_upload_limit');
+  assert.equal(await upload(hash('classmate')), true, 'others on the same connection can still upload');
   await rejects(upload(guest, hash('new-ip')), 'landwise_upload_limit');
+  await as('postgres');
+  await query('update landwise_private.landwise_upload_days set attempts = 59 where day = current_date and scope = $1', [`ip:${ip}`]);
+  await as('service_role');
+  assert.equal(await upload(hash('classmate-2')), true);
+  await rejects(upload(hash('classmate-3')), 'landwise_upload_limit');
   assert.equal(await upload(hash('new-guest'), hash('new-ip')), true);
   assert.equal((await reserve()).admitted, true, 'uploads do not consume AI attempts');
   await as('postgres');
-  await query("insert into landwise_private.landwise_upload_days(day,scope,attempts) values (current_date-4,'global',99)");
-  await query("update landwise_private.landwise_upload_days set attempts=99 where day=current_date and scope='global'");
+  await query("insert into landwise_private.landwise_upload_days(day,scope,attempts) values (current_date-4,'global',299)");
+  await query("update landwise_private.landwise_upload_days set attempts=299 where day=current_date and scope='global'");
   await as('service_role');
   assert.equal(await upload(hash('last-guest'), hash('last-ip')), true);
   await rejects(upload(hash('one-too-many'), hash('one-too-many')), 'landwise_upload_limit');
   await as('postgres');
   assert.equal((await query('select count(*)::integer as count from landwise_private.landwise_upload_days where day<current_date-2')).rows[0].count, 0);
-  assert.equal((await query("select attempts from landwise_private.landwise_upload_days where day=current_date and scope='global'")).rows[0].attempts, 100);
+  assert.equal((await query("select attempts from landwise_private.landwise_upload_days where day=current_date and scope='global'")).rows[0].attempts, 300);
 });

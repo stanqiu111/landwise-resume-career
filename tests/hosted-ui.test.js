@@ -1,11 +1,48 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canRecoverHostedRequest, createHostedRequestIds, guestDraftForAccount, hostedActionAccess, hostedFailureMessage, keepHostedRequestId, validateHostedInputs } from '../src/hostedAccess.js';
+import { readFile } from 'node:fs/promises';
+import { GUEST_TAILORINGS, LOCAL_SETUP_URL, canRecoverHostedRequest, createHostedRequestIds, guestDraftForAccount, hostedActionAccess, hostedFailureMessage, keepHostedRequestId, validateHostedInputs } from '../src/hostedAccess.js';
 import { canStartLandwiseSignIn, cloudAuthorizationHeaders, validateStorageConfig } from '../src/cloudAccount.js';
+import { GUEST_TAILORINGS as SERVER_GUEST_TAILORINGS } from '../server/hosted-budget.js';
 
-const guestSession = { available: true, guestEligible: true, authenticated: false, remaining: 0, limit: 3 };
+const guestSession = { available: true, guestEligible: true, authenticated: false, remaining: 15, limit: 15 };
 
-test('guests may tailor once but cannot analyze or revise without a free account', () => {
+test('guests see how many of their 15 free tailorings are left, then where to run Landwise locally', () => {
+  assert.equal(GUEST_TAILORINGS, 15);
+  assert.equal(GUEST_TAILORINGS, SERVER_GUEST_TAILORINGS, 'browser copy and server limit agree');
+  assert.match(LOCAL_SETUP_URL, /^https:\/\/github\.com\/stanqiu111\/landwise-resume-career\/blob\/main\/docs\/LOCAL_DEVELOPMENT\.md#run-landwise-on-your-computer$/);
+  assert.equal(hostedActionAccess(guestSession, false, 'transform', false).message, 'You have 15 free tailorings. No signup required.');
+  assert.equal(hostedActionAccess({ ...guestSession, remaining: 4 }, false, 'transform', false).message, '4 of 15 free tailorings left. No signup required.');
+  assert.equal(hostedActionAccess({ ...guestSession, remaining: 1 }, false, 'transform', false).allowed, true);
+  const usedUp = hostedActionAccess({ ...guestSession, available: false, guestEligible: false, remaining: 0, reason: 'guest_trial_used' }, false, 'transform', false);
+  assert.equal(usedUp.allowed, false);
+  assert.equal(usedUp.local, true);
+  assert.equal(usedUp.exhausted, true);
+  assert.equal(usedUp.signIn, false);
+  for (const reason of ['daily_limit', 'monthly_limit', 'monthly_budget']) {
+    assert.equal(hostedActionAccess({ ...guestSession, available: false, reason }, false, 'transform', false).local, true, `${reason} offers the local version`);
+  }
+  assert.notEqual(hostedActionAccess({ ...guestSession, available: false, reason: 'ai_busy' }, false, 'transform', false).local, true);
+  assert.match(usedUp.message, /used your 15 free tailorings\. To keep going, run Landwise on your own computer with your ChatGPT account/);
+  const withAccounts = hostedActionAccess({ ...guestSession, available: false, guestEligible: false, remaining: 0, reason: 'guest_trial_used' }, false, 'transform', true);
+  assert.equal(withAccounts.signIn, true);
+  assert.match(withAccounts.message, /Create a free Landwise account, or run Landwise on your own computer/);
+  const feedback = hostedActionAccess(guestSession, false, 'analyze', false);
+  assert.equal(feedback.local, true);
+  assert.match(feedback.message, /Resume feedback and follow-up changes are available when you run Landwise on your own computer/);
+  assert.match(hostedFailureMessage({ code: 'hosted_ai_allowance_used' }, false, false), /used your 15 free tailorings/);
+  assert.match(hostedFailureMessage({ code: 'hosted_ai_allowance_used' }, true, false), /monthly AI allowance/);
+  assert.match(hostedFailureMessage({ code: 'cloud_sign_in_required' }, false, false), /run Landwise on your own computer/);
+});
+
+test('the live site’s local-setup link lands on an existing heading', async () => {
+  const guide = await readFile(new URL('../docs/LOCAL_DEVELOPMENT.md', import.meta.url), 'utf8');
+  const slug = heading => heading.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, '').replace(/\s/g, '-');
+  const anchors = guide.split('\n').filter(line => /^#{1,6} /.test(line)).map(line => slug(line.replace(/^#+ /, '')));
+  assert.ok(anchors.includes(LOCAL_SETUP_URL.split('#')[1]));
+});
+
+test('guests may tailor but cannot analyze or revise without a free account', () => {
   assert.equal(hostedActionAccess(guestSession, false, 'transform').allowed, true);
   assert.equal(hostedActionAccess(guestSession, false, 'analyze').signIn, true);
   assert.equal(hostedActionAccess(guestSession, false, 'revise').allowed, false);
@@ -32,7 +69,7 @@ test('hosted signup stays disabled until explicitly enabled, without disabling e
   assert.equal(canStartLandwiseSignIn({ ...config, signInEnabled: true }, true), true);
   assert.equal(canStartLandwiseSignIn({ ...config, signInEnabled: undefined }, false), true);
   assert.equal(hostedActionAccess(guestSession, false, 'transform', false).allowed, true);
-  assert.match(hostedActionAccess({ ...guestSession, guestEligible: false }, false, 'transform', false).message, /sign-in is being connected/);
+  assert.match(hostedActionAccess({ ...guestSession, guestEligible: false }, false, 'transform', false).message, /used your 15 free tailorings/);
   assert.equal(hostedActionAccess({ ...guestSession, authenticated: true, remaining: 2 }, true, 'revise', false).allowed, true);
   assert.doesNotMatch(hostedFailureMessage({ code: 'hosted_ai_allowance_used' }, false, false), /3|Create a free/);
 });

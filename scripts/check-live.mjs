@@ -19,4 +19,5 @@ const config = await get('/api/storage/config');
 if (config.mode !== 'hosted' || config.storage !== 'supabase') throw new Error('Hosted storage is not configured.');
 // Print availability only; never log the cookie, CSRF token, or keys.
 console.info(JSON.stringify({ origin: origin.origin, configured: true, aiAvailable: session.available,
-  reason: session.reason || null, accountSignInEnabled: config.signInEnabled }, null, 2));
+  reason: session.reason || null, accountSignInEnabled: config.signInEnabled,
+  newGuestRemaining: session.remaining ?? null, newGuestLimit: session.limit ?? null }, null, 2));

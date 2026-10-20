@@ -43,10 +43,19 @@ OpenAI usage/remaining credit, and outdated career-event sources. Review
 run `npm audit fix --force` blindly. Run `npm run check` after dependency changes.
 Keep `package-lock.json` committed and use `npm ci` for reproducible installs.
 
-**Monthly and before raising usage:** review the US$4 application gate and
-provider limit together, reconcile conservatively charged failures, recheck
+**Monthly and before raising usage:** review the US$10 application gate and the
+provider limit (at least US$11) together, reconcile conservatively charged failures, recheck
 model pricing and call bounds, and test restoring a private database backup.
 The successful live test cost is an example, not a promise of cost per resume.
+
+**For the first week after raising limits:** run this daily in the SQL Editor. Any
+row is a stuck job that blocks all AI work; handle it with
+[Stop AI spending or investigate a stuck job](#stop-ai-spending-or-investigate-a-stuck-job).
+
+```sql
+select id, created_at from landwise_private.landwise_ai_jobs
+where status = 'reserved' and created_at < clock_timestamp() - interval '6 minutes';
+```
 
 ## Deployments and rollback
 
@@ -83,6 +92,13 @@ Git and redeploy so the source and live state agree. Code rollback does not
 roll back Supabase migrations or restore deleted user data; plan additive,
 backward-compatible migrations and verify database compatibility before rollback.
 
+**Guest-trial limits:** once `202610200001_landwise_guest_trials.sql` is applied,
+never restore a deployment from before that change until you have run
+`supabase/rollbacks/202610200001_landwise_guest_trials_down.sql` in the SQL
+Editor. Older servers reject a status above 3 remaining, so every guest session
+would fail. To lower limits or stop spending, roll forward instead: apply new
+limits in a new migration, or set `LANDWISE_HOSTED_AI_ENABLED=false` and redeploy.
+
 ## Stop AI spending or investigate a stuck job
 
 Set `LANDWISE_HOSTED_AI_ENABLED=false` in Vercel Production and redeploy.
@@ -110,7 +126,8 @@ request IDs in the browser do not survive refresh.
 Keep the dedicated provider hard limit enabled and auto-reload OFF. Verify these
 settings in the provider dashboard; code does not configure or prove them.
 OpenAI hard-limit enforcement can slightly overshoot while state
-propagates, which is why the app has a lower US$4 gate. An alert alone is not a
+propagates, which is why the app’s US$10 gate stays at least US$1 below the
+provider limit (US$11 or more). An alert alone is not a
 spending stop. [OpenAI spend limits](https://developers.openai.com/api/docs/guides/spend-limits)
 
 ## Backups and data retention
@@ -166,8 +183,8 @@ For source publication, also complete [the repository security checklist](../SEC
   for a personal plan. Review eligibility before operating this as a business.
   [Vercel Hobby](https://vercel.com/docs/plans/hobby)
 - **Operations:** arrange alert delivery, ownership of incident response,
-  tested backups, and privacy/retention disclosures. Current one-job concurrency
-  and low daily limits are a deliberately small pilot, not a launch-scale service.
+  tested backups, and privacy/retention disclosures. One-job concurrency and the
+  300/day site limit are still a small pilot, not a launch-scale service.
 - **Schema management:** reconcile CLI migration history before adopting
-  `supabase db push`. The three checked-in migrations were already applied
-  through the SQL Editor. Add new migrations; never edit/reapply old ones.
+  `supabase db push`. Checked-in migrations are applied through the SQL
+  Editor; [DEPLOYMENT.md](DEPLOYMENT.md#applied-migrations) lists each applied file. Add new migrations; never edit/reapply old ones.
