@@ -1,6 +1,6 @@
 # Operating the live site
 
-Reviewed October 19, 2026. Start here for routine maintenance.
+Reviewed October 20, 2026. Start here for routine maintenance.
 The detailed configuration and caps are in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Who runs what
@@ -92,7 +92,7 @@ Git and redeploy so the source and live state agree. Code rollback does not
 roll back Supabase migrations or restore deleted user data; plan additive,
 backward-compatible migrations and verify database compatibility before rollback.
 
-**Guest-trial limits:** once `202610200001_landwise_guest_trials.sql` is applied,
+**Guest-trial limits:** `202610200001_landwise_guest_trials.sql` is applied, so
 never restore a deployment from before that change until you have run
 `supabase/rollbacks/202610200001_landwise_guest_trials_down.sql` in the SQL
 Editor. Older servers reject a status above 3 remaining, so every guest session

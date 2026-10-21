@@ -1,6 +1,6 @@
 # Deployment reference
 
-Reviewed October 19, 2026. For routine checks, outages, backups and rollback,
+Reviewed October 20, 2026. For routine checks, outages, backups and rollback,
 use [OPERATIONS.md](OPERATIONS.md).
 
 ## Current service
@@ -127,7 +127,7 @@ functions. Keep the existing files unchanged.
 | `202610160001_landwise_foundation.sql` | `faf3a00d274d7343f382e0ce3cc96acbabd99840db07b8c56bbc7638aade0a9b` |
 | `202610170001_landwise_storage_limits.sql` | `1e59e5ea6ca302335b9ab751e8ee62f6601d1e23de35715101110d6ccbd25634` |
 | `202610170002_landwise_ai_budget.sql` | `8cc558ac4b008579daeb1e1a9458fcff402e7f2a9c67708a173f27ded9665c70` |
-| `202610200001_landwise_guest_trials.sql` | Pending: apply after the server deploy ([SUPABASE.md](SUPABASE.md) migration step 3) |
+| `202610200001_landwise_guest_trials.sql` | `b0b03de0a9fe9968e7d18474116e21d7df7d544757b29bd7288fc2025ba1f71a` |
 
 Application CRUD uses a verified user's token, never the service-role credential.
 The seven private AI/upload ledger tables and five server-only RPCs are not
@@ -169,6 +169,14 @@ A protected temporary concurrency harness admitted one of two competing jobs,
 rejected the other as busy, and settled its test reservations at known zero
 provider cost. It was removed; test attempts remained counted. This is evidence
 for the tested race, not every possible database schedule.
+
+October 20 guest-trial rollout: 375 automated tests passed, including an
+upgrade test that applies the migration twice to a ledger holding existing
+jobs and allowances, then rolls it back. The server that accepts 15 remaining
+was deployed first and returned `"limit":15`; the migration was then applied in
+the SQL Editor. The [SUPABASE.md](SUPABASE.md) verification query returned the
+expected values for all three functions, and `npm run check:live` reported 15
+remaining for a new guest. No AI request was made for these checks.
 
 October 19 typography verification checked 24 UI states across 320, 390, 768
 and 1440px widths using mocked AI results, with no overflow/runtime errors.

@@ -1,11 +1,11 @@
 # Landwise accounts, storage and hosted API ledger
 
-Updated October 19, 2026. The deployment uses a Supabase Free project.
+Updated October 20, 2026. The deployment uses a Supabase Free project.
 The public URL is
 **https://landwise-resume.vercel.app**.
 
-The foundation, storage and hosted AI ledger migrations are applied remotely. The
-guest-trial migration is applied separately, after its server deploy (step 3).
+The foundation, storage, hosted AI ledger and guest-trial migrations are applied
+remotely. The guest-trial migration was applied after its server deploy (step 3).
 **Guest hosted AI is active** after a live synthetic Transform, committed-cost
 replay, exhausted-trial checks and a protected concurrent-reservation test.
 Both runtime credentials are stored as Vercel Production Secrets; the existing
@@ -53,10 +53,11 @@ growth is rejected atomically. Deletions and smaller edits reclaim quota.
    tables, five server RPCs, zero browser-callable RPCs, five service-role-callable
    RPCs and zero AI jobs. It does not activate AI, fund an API account or configure
    email delivery. No resumes or AI jobs were created by these checks.
-3. Guest trials: `202610200001_landwise_guest_trials.sql` replaces only the
+3. Guest trials: `202610200001_landwise_guest_trials.sql` is also already
+   applied via the SQL Editor (October 20, 2026). It replaces only the
    status, reserve and upload functions: 15 successful Transforms per guest
    cookie for life, 60 attempts/IP/day, 300/day and 3,000/month site-wide, and a
-   US$10 monthly budget. Apply it in this order:
+   US$10 monthly budget. On another live project, apply it in this order:
    1. Raise the OpenAI project's hard spending limit to at least US$11, keep
       auto-reload OFF, and make sure prepaid credit covers this month.
    2. Deploy the server from the same commit. Continue only when a fresh

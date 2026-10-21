@@ -3,7 +3,7 @@
 This guide is for people who run or change Landwise. The [README](../README.md)
 describes the product.
 
-Status reviewed October 19, 2026: guest AI tailoring is live. Public account
+Status reviewed October 20, 2026: guest AI tailoring is live. Public account
 sign-in and account libraries are not yet enabled; email delivery still needs
 setup and testing.
 
