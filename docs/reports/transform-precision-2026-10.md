@@ -68,7 +68,9 @@ What changed:
 - **Fit report.** An edited bullet that still states the quoted fact keeps counting as evidence; before, any rewording of the quoted words dropped it. An edit that deletes the fact never counts. "Edits made" lists only edits that were kept. When the AI gives no next step, the default advice now depends on the type of requirement.
 - **Local use** sends JSON-mode requests, like the hosted site.
 
-Not fixed yet: the number check reads only digits, so a spelled-out number ("three") can change unnoticed. This applies to the live version too (see section 4).
+Not fixed in `a6bc035`: the number check read only digits, so a spelled-out number ("three") could change unnoticed. This applies to the live version too (see section 4).
+
+**Fixed on this branch, not shipped yet.** The number check now also reads numbers written in words ("three", "seventy-five", "a dozen", "doubled", "hundreds of", "second place") and the letters after a number ("$1.5M" against "$1.5B"). "three" and "3" count as the same number, and "one-on-one", "double-check" and "first aid" are not numbers. An edit that turns its bullet into a copy of another bullet is removed with its own reason code: an exact copy, or an edit made at least 80% of another bullet's words that keeps less than half of its own. The same number check covers follow-up edits and the whole-draft check for new numbers. These checks were written again for today's version, not taken from ship3b, and are tested with unit tests only: they have not been replayed on the recorded runs yet. In 19,920 lines of five or more words from 500 public resumes ([opensporks/resumes](https://huggingface.co/datasets/opensporks/resumes)), 3.9% contain a number word and 15.8% contain digits, so the new part of the number check can affect edits to only a small share of bullets. "first" is the most common number word. Its most common use, "first aid" (42 lines), was found in this count and is now excluded; "first year" (11) is the next.
 
 ## 4. Built, not shipped: the targeted writer
 
@@ -194,7 +196,7 @@ In the live version, most of the time goes to reading the job and resume (median
 3. Cut the fact-check's false alarms further, so ship3 keeps more harmless edits and uses the job's wording where the resume supports it (ship3b's quote check is a first step). Screen the result with AI reviewers on 26 dev pairs.
 4. Run the final check on the 32 new pairs: today's version against the final ship3, AI reviewers, the same ship rules. Add the planned second review of every invented-detail flag.
 5. If ship3 passes, ask you before shipping, because it changes what the AI writes. Then update the docs and the progress screen text. If it fails, keep today's version and report which rule failed.
-6. Separately, for today's version: extend the number check to spelled-out numbers and to edits that copy another bullet (both written and tested in ship3b).
+6. Separately, for today's version: extend the number check to spelled-out numbers and to edits that copy another bullet. Written and unit-tested on this branch (section 3), not shipped. Before shipping, replay the recorded replies of all 110 pairs through the new checks, and count the edits it newly removes and whether any delivered result loses all its edits.
 7. Open questions for you, any time: whether the local version should use gpt-6-luna at low effort, and whether you want to spot-check 10 random results and every confirmed invented detail before anything ships (the original plan included this).
 
 ## Appendix: definitions

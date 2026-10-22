@@ -54,6 +54,7 @@ test('incomplete tailored drafts are rejected', () => {
   assert.throws(() => parseTailoredResult(JSON.stringify({ ...good, transformedResume: good.transformedResume.replace('alex@example.com', 'no contact here') }), resume));
   assert.throws(() => parseTailoredResult(JSON.stringify({ ...good, transformedResume: good.transformedResume.replace('EDUCATION', 'STUDIES') }), resume));
   assert.throws(() => parseTailoredResult(JSON.stringify({ ...good, transformedResume: good.transformedResume.replace('React dashboards', 'React dashboards for 500 users') }), resume));
+  assert.throws(() => parseTailoredResult(JSON.stringify({ ...good, transformedResume: good.transformedResume.replace('React dashboards', 'React dashboards for five hundred users') }), resume));
   assert.throws(() => parseTailoredResult('not JSON', resume));
 });
 

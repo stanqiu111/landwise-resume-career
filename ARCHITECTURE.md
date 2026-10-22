@@ -60,16 +60,21 @@ change the SQL, adapter constants, tests and docs together when changing policy.
 other structure. At most 35% of recognized bullets, rounded up with a minimum
 allowance of one, may change. `screenResumeEdits` checks each replacement on
 its own and drops, with a reason code only, any that targets a non-bullet or
-repeated line, is empty or multiline, grows more than 8 words, changes a source
-number, removes an email or link, adds a key term of an unsupported requirement,
-adds a named tool, technology, standard or credential of a requirement with only
-related evidence, adds a supported term to a bullet that does not hold that
-requirement's evidence, or exceeds the cap; the valid edits still apply. A
-replacement identical to its bullet is not counted as an edit. When an edit is
-dropped, "Edits made" is written by code from the kept edits. `text-match.js`
-compares quotes and terms as whole words with curly quotes and dashes folded, so
-"Java" is never found inside "JavaScript". Claims keep any type label, so a fact
-the model labels "education" is never dropped. Text without recognized bullet
+repeated line, is empty or multiline, grows more than 8 words, copies another
+bullet (exactly, or mostly another bullet's words while keeping less than half
+of its own), changes a source number, removes an email or link, adds a key term
+of an unsupported requirement, adds a named tool, technology, standard or
+credential of a requirement with only related evidence, adds a supported term to
+a bullet that does not hold that requirement's evidence, or exceeds the cap; the
+valid edits still apply. A replacement identical to its bullet is not counted as
+an edit. When an edit is dropped, "Edits made" is written by code from the kept
+edits. `text-match.js` compares quotes and terms as whole words with curly
+quotes and dashes folded, so "Java" is never found inside "JavaScript". Its
+`numberTokens` reads numbers in digits and words alike, so "three" and "3" are
+the same number, "$1.5M" and "$1.5B" are different, and "one-on-one" is not a
+number; the same tokens back the whole-draft check for new numbers in
+`resume-quality.js`. Claims keep any type label, so a fact the model labels
+"education" is never dropped. Text without recognized bullet
 markers stays unchanged.
 `resume-quality.js` checks contact/education retention, numeric claims and other
 constraints; these checks do not prove every sentence's semantic truth.

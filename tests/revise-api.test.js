@@ -120,6 +120,7 @@ test('unsupported tools, invented metrics, mismatched evidence and broad rewrite
     { ...dashboardEdit, replacement: 'Built React dashboards with Docker for operations.' },
     { ...dashboardEdit, replacement: 'AWS integrations for React dashboards for operations.' },
     { ...dashboardEdit, replacement: 'Built 10 React dashboards for operations.' },
+    { ...dashboardEdit, replacement: 'Built two React dashboards for operations.' },
     { ...dashboardEdit, sourceQuote: '- Created a planner that groups coursework by deadline and displays progress for each class.' },
     { ...dashboardEdit, lineId: 'line-8', replacement: 'Senior Engineer | New company' },
   ]) {
@@ -131,7 +132,7 @@ test('unsupported tools, invented metrics, mismatched evidence and broad rewrite
   }
   answer = { transformedResume: 'An entirely new resume.', reply: 'Rewrote it.' };
   assert.equal((await post(fixture())).body.code, 'invalid_resume_revision');
-  assert.equal(calls, 7);
+  assert.equal(calls, 8);
 });
 
 test('metrics cannot be borrowed from another bullet even when both values exist in the original', async t => {

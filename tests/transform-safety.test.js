@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { applyResumeEdits, editableResumeLines, screenResumeEdits } from '../server/resume-edits.js';
 import { buildTailoringReport } from '../server/tailoring-report.js';
 import { groundClaims } from '../server/resume-quality.js';
+import { numberTokens } from '../server/text-match.js';
 import { transformResume } from '../server/transform.js';
 import { studentResume } from './fixtures/resumes.js';
 
@@ -51,6 +52,43 @@ test('named tools of related-only requirements, removed contacts and +9-word edi
   assert.deepEqual(dropped.map(item => item.reason), ['semantic_keyword', 'contact_removed', 'expansion']);
   const ok = screenResumeEdits(source, [{ lineId: 'line-6', replacement: 'Fixed flaky tests in the build pipeline, cutting reruns for every single developer.' }], requirements, matches);
   assert.equal(ok.kept.length, 1, 'exactly 8 more words is allowed');
+});
+
+test('numbers written in words or with M/B suffixes count like digits, but "three" to "3" is not a change', () => {
+  const source = 'Sam Lee\nsam@example.com\nEXPERIENCE\nTutor | Acme | 2024\n- Tutored three students in algebra each week.\n- Raised $1.5M for the campus food bank.\n- Built a study guide for the course.\n- Placed second in the regional math contest.\n- Led one-on-one sessions for new tutors.\n- Cut printing costs by 30% with shared notes.\n- Doubled sign-ups for the spring review sessions.\n- Answered questions from hundreds of students online.';
+  const { dropped } = screenResumeEdits(source, [
+    { lineId: 'line-4', replacement: 'Tutored seventy-five students in algebra each week.' },
+    { lineId: 'line-5', replacement: 'Raised $1.5B for the campus food bank.' },
+    { lineId: 'line-6', replacement: 'Built two study guides for the course.' },
+  ]);
+  assert.deepEqual(dropped.map(item => item.reason), ['metrics_changed', 'metrics_changed', 'metrics_changed']);
+  assert.deepEqual(screenResumeEdits(source, [
+    { lineId: 'line-7', replacement: 'Placed first in the regional math contest.' },
+    { lineId: 'line-10', replacement: 'Tripled sign-ups for the spring review sessions.' },
+    { lineId: 'line-11', replacement: 'Answered questions from thousands of students online.' },
+  ]).dropped.map(item => item.reason), ['metrics_changed', 'metrics_changed', 'metrics_changed']);
+  const { kept } = screenResumeEdits(source, [
+    { lineId: 'line-4', replacement: 'Tutored 3 students in algebra every week.' },
+    { lineId: 'line-5', replacement: 'Raised $1.5 million for the campus food bank.' },
+    { lineId: 'line-8', replacement: 'Led individual sessions for new tutors.' },
+    { lineId: 'line-9', replacement: 'Cut printing costs by 30 percent with shared notes.' },
+  ]);
+  assert.equal(kept.length, 3, 'the 35% budget allows 3 of 8 bullets');
+  assert.deepEqual(numberTokens('Certified in CPR and First Aid; first-hand experience with one-on-one care.'), []);
+  assert.throws(() => applyResumeEdits(source, [{ lineId: 'line-4', replacement: 'Tutored seventy-five students in algebra each week.' }]), /metrics/);
+});
+
+test('an edit that copies another bullet is dropped; similar wording and duplicated source bullets are not copies', () => {
+  const source = 'Sam Lee\nsam@example.com\nEXPERIENCE\nTutor | Acme | 2024\n- Tutored three students in algebra each week.\n- Tutored seventy-five students in calculus each term.\nVolunteer | Food Bank | 2023\n- Wrote onboarding guides for new volunteers.\n- Scheduled shifts and tracked attendance in Google Sheets.\n- Answered customer emails.\nCashier | Market | 2022\n- Answered customer emails.\n- Counted the till at closing.\n- Restocked shelves and checked prices.';
+  const { kept, dropped } = screenResumeEdits(source, [
+    { lineId: 'line-4', replacement: 'Tutored seventy-five students in calculus each term.' },
+    { lineId: 'line-7', replacement: 'Scheduled volunteer shifts and tracked attendance in Google Sheets.' },
+    { lineId: 'line-9', replacement: 'Answered customer emails promptly.' },
+  ]);
+  assert.deepEqual(dropped, [{ lineId: 'line-4', reason: 'copied_bullet' }, { lineId: 'line-7', reason: 'copied_bullet' }]);
+  assert.deepEqual(kept.map(edit => edit.lineId), ['line-9']);
+  assert.equal(screenResumeEdits(source, [{ lineId: 'line-7', replacement: 'Wrote clear onboarding guides for new volunteers.' }]).kept.length, 1);
+  assert.throws(() => applyResumeEdits(source, [{ lineId: 'line-4', replacement: 'Tutored seventy-five students in calculus each term.' }]), /copies another bullet/);
 });
 
 test('quotes match whole words only, and a supported term is never attached to an unrelated bullet', () => {

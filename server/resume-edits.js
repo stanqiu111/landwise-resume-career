@@ -1,6 +1,26 @@
-import { containsPhrase, isNamedTerm } from './text-match.js';
+import { containsPhrase, contentWords, isNamedTerm, normalizeText, numbersDiffer } from './text-match.js';
 
 const wordCount = text => text.replace(/^\s*[-•*]\s+/, '').trim().split(/\s+/).filter(Boolean).length;
+const sameBullet = (a, b) => {
+  const plain = text => normalizeText(text.replace(/^\s*[-•*]\s+/, '')).replace(/[.;!]+$/, '');
+  return plain(a) === plain(b);
+};
+
+// An edit that turns its bullet into another bullet: an exact copy of a
+// different bullet, or one made at least 80% of another bullet's words while
+// keeping less than half of its own. Bullets that were already identical are
+// not counted as copies of each other.
+export function copiesAnotherBullet(source, replacement, bullets) {
+  const words = contentWords(replacement);
+  const own = contentWords(source.text);
+  const kept = own.filter(word => words.includes(word)).length;
+  return bullets.some(other => {
+    if (other.id === source.id || sameBullet(other.text, source.text)) return false;
+    if (sameBullet(other.text, replacement)) return true;
+    const theirs = new Set(contentWords(other.text));
+    return words.length >= 3 && words.filter(word => theirs.has(word)).length >= 0.8 * words.length && kept < 0.5 * own.length;
+  });
+}
 
 // Keep every source entry and its order. The model can only replace selected
 // existing bullets; it cannot regenerate or silently drop entire experiences.
@@ -27,9 +47,8 @@ export function applyResumeEdits(resume, edits = []) {
     if (!replacement || /[\r\n]/.test(replacement)) throw new Error('An edit must preserve one existing bullet.');
     // Keep edits small and prevent an oversized new narrative under a real role.
     if (wordCount(replacement) > wordCount(source.text) + 8) throw new Error('An edit expands the original experience too far.');
-    const beforeNumbers = source.text.match(/\d+(?:[.,]\d+)?[%+]?/g) || [];
-    const afterNumbers = replacement.match(/\d+(?:[.,]\d+)?[%+]?/g) || [];
-    if (beforeNumbers.some(n => !afterNumbers.includes(n)) || afterNumbers.some(n => !beforeNumbers.includes(n))) throw new Error('An edit changes source metrics.');
+    if (copiesAnotherBullet(source, replacement, editable)) throw new Error('An edit copies another bullet.');
+    if (numbersDiffer(source.text, replacement)) throw new Error('An edit changes source metrics.');
     seen.add(edit.lineId);
     lines[Number(edit.lineId.slice(5))] = source.text.match(/^\s*[-•*]\s+/)[0] + replacement;
   }
@@ -54,8 +73,9 @@ export function rejectUnsupportedAdditions(original, draft, requirements, matche
 
 // Check each edit on its own, so one invalid edit is dropped instead of failing
 // the whole draft. Returns the edits that pass and, for the others, a reason code
-// only (never text). Besides the rules applyResumeEdits enforces, an edit may not
-// remove an email or link from its bullet, may not add a key term of a
+// only (never text). Besides the rules applyResumeEdits enforces (including no
+// changed number, in digits or words, and no copy of another bullet), an edit may
+// not remove an email or link from its bullet, may not add a key term of a
 // requirement the resume does not support, and may not add a named tool,
 // technology, standard or credential of a requirement with only related evidence
 // to a bullet that did not already name it (general wording is allowed).
@@ -67,7 +87,6 @@ export function screenResumeEdits(resume, edits, requirements = [], matches = []
   if (!Array.isArray(edits)) throw new Error('Invalid resume edits.');
   const editable = editableResumeLines(resume);
   const limit = Math.max(1, Math.ceil(editable.length * 0.35));
-  const numbers = text => text.match(/\d+(?:[.,]\d+)?[%+]?/g) || [];
   const contacts = text => (text.match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}|https?:\/\/[^\s)]+|www\.[^\s)]+/gi) || []).map(item => item.toLowerCase());
   const matchOf = requirement => matches.find(item => item.requirement_id === requirement.id);
   const termsOf = list => list.flatMap(requirement => requirement.keywords || []).filter(term => typeof term === 'string' && term.trim().length > 1);
@@ -89,18 +108,17 @@ export function screenResumeEdits(resume, edits, requirements = [], matches = []
   for (const edit of edits) {
     const source = editable.find(line => line.id === edit?.lineId);
     const replacement = typeof edit?.replacement === 'string' ? edit.replacement.trim().replace(/^[-•*]\s+/, '') : '';
-    const before = source ? numbers(source.text) : [];
-    const after = numbers(replacement);
     const reason = !source || typeof edit?.replacement !== 'string' ? 'invalid_target'
       : seen.has(edit.lineId) ? 'duplicate_target'
         : !replacement || /[\r\n]/.test(replacement) ? 'multiline_or_empty'
           : wordCount(replacement) > wordCount(source.text) + 8 ? 'expansion'
-            : before.some(n => !after.includes(n)) || after.some(n => !before.includes(n)) ? 'metrics_changed'
-              : contacts(source.text).some(contact => !replacement.toLowerCase().includes(contact)) ? 'contact_removed'
-                : unsupportedTerms.some(term => containsPhrase(replacement, term)) ? 'unsupported_keyword'
-                  : relatedTerms.some(term => containsPhrase(replacement, term) && !containsPhrase(source.text, term)) ? 'semantic_keyword'
-                    : misplaced(source.text, replacement) ? 'misplaced_keyword'
-                      : kept.length >= limit ? 'over_limit' : null;
+            : copiesAnotherBullet(source, replacement, editable) ? 'copied_bullet'
+              : numbersDiffer(source.text, replacement) ? 'metrics_changed'
+                : contacts(source.text).some(contact => !replacement.toLowerCase().includes(contact)) ? 'contact_removed'
+                  : unsupportedTerms.some(term => containsPhrase(replacement, term)) ? 'unsupported_keyword'
+                    : relatedTerms.some(term => containsPhrase(replacement, term) && !containsPhrase(source.text, term)) ? 'semantic_keyword'
+                      : misplaced(source.text, replacement) ? 'misplaced_keyword'
+                        : kept.length >= limit ? 'over_limit' : null;
     if (reason) dropped.push({ lineId: typeof edit?.lineId === 'string' ? edit.lineId : null, reason });
     else { kept.push(edit); seen.add(edit.lineId); }
   }

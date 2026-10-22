@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { containsPhrase, normalizeText } from './text-match.js';
+import { containsPhrase, normalizeText, numberTokens } from './text-match.js';
 
 const TailoredResultSchema = z.object({
   transformedResume: z.string().trim().min(80),
@@ -56,8 +56,7 @@ export function parseTailoredResult(text, originalResume) {
   if (/^education\s*:?\s*$/im.test(originalResume) && !/^education\s*:?\s*$/im.test(output)) {
     throw new Error('Tailored resume omitted the education section.');
   }
-  const sourceNumbers = new Set(originalResume.match(/\d+(?:[.,]\d+)?[%+]?/g) || []);
-  const newNumbers = (output.match(/\d+(?:[.,]\d+)?[%+]?/g) || []).filter(number => !sourceNumbers.has(number));
-  if (newNumbers.length) throw new Error('Tailored resume added a number not present in the source.');
+  const sourceNumbers = new Set(numberTokens(originalResume));
+  if (numberTokens(output).some(number => !sourceNumbers.has(number))) throw new Error('Tailored resume added a number not present in the source.');
   return parsed;
 }
