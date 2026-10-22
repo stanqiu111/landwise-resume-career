@@ -3,8 +3,11 @@ import { z } from 'zod';
 // Resume claim extracted from original text
 export const ClaimSchema = z.object({
   id: z.string(),
-  text: z.string(),
-  type: z.enum(['metric', 'skill', 'responsibility', 'domain', 'tool', 'leadership', 'impact']),
+  // groundClaims sets text to the verified raw_phrase, so the model need not repeat it.
+  text: z.string().optional().default(''),
+  // Any short label: a fact labelled "education" or "qualification" must never be
+  // dropped (that silently turned listed degrees into gaps). Nothing branches on it.
+  type: z.string().max(40).catch('fact'),
   raw_phrase: z.string(),
   confidence: z.number().min(0).max(1).optional().default(0.8),
 });

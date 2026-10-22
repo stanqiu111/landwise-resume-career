@@ -146,7 +146,7 @@ Return feedback for every requirement. Unsupported gaps must stay outside the re
     }
     const changed = transformedResume !== result.transformedResume;
     const feedback = changed && response.requirementFeedback.length ? response.requirementFeedback : (result.report?.items || []).map(item => ({ requirement_id: item.id, resumeQuote: item.resumeQuote, nextStep: item.nextStep }));
-    const report = buildTailoringReport(jdRequirements, claimMatches, resumeClaims, transformedResume, feedback);
+    const report = buildTailoringReport(jdRequirements, claimMatches, resumeClaims, transformedResume, feedback, resume);
     const revision = { instruction, reply: response.reply, createdAt: new Date().toISOString(), changed };
     return { ...parsed, resumeClaims, jdRequirements, claimMatches, ...summarizeCoverage(jdRequirements, claimMatches),
       job: result.job || { company: '', roleTitle: '' }, report, matchScore: report.score,

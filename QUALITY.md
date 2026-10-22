@@ -18,7 +18,7 @@ These are design references. No source code was copied from those repositories.
 2. Preserve contact details, education, employers, titles, dates, and other source sections.
 3. Reject claim citations whose quoted phrase is absent from the original resume and use the source quote as the claim text. Ignore malformed extracted items individually.
 4. Validate claim and requirement IDs before calculating coverage. Unsupported requirements stay out of the resume.
-5. Ask for small edits to identified source bullets, retaining their purpose, domain and main achievements. Apply edits to the original text so every unedited line, role and project remains. Enforce the edit cap; reject new/deleted/multiline bullets and changed metrics. Show original/revised bullets for review.
+5. Ask for small edits to identified source bullets, retaining their purpose, domain and main achievements. Apply edits to the original text so every unedited line, role and project remains. Enforce the edit cap and check each edit on its own: drop new/deleted/multiline bullets, changed metrics, removed contact details and unsupported or misplaced key terms, and keep the valid edits. Show original/revised bullets for review.
 6. Render the same plain-text structure in the preview, PDF, and DOCX.
 7. Keep the output within the original PDF's page count, or the selected limit for pasted text. Measure actual line wrapping before accepting the result and use the same layout for export. Allow one concise editing pass on overflow, then return an error if it still cannot fit. Never silently truncate content or reduce body text below 10.5 pt.
 

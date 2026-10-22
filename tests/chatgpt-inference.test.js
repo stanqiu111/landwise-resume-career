@@ -56,6 +56,7 @@ const visibleModels = [
   { slug: 'account-second', display_name: 'Second model', visibility: 'list' },
 ];
 const prompt = { model: 'legacy-claude-model', max_tokens: 100, system: 'Return JSON.', messages: [{ role: 'user', content: 'A sample resume.' }] };
+const JSON_INSTRUCTION = 'Return one valid JSON object only. Do not include Markdown fences or text outside the JSON object.';
 
 function fixture({ models = visibleModels, modelResponse, events, streamError, inferenceError, getAccessToken, streamFinalizer } = {}) {
   const calls = { catalog: [], client: [], inference: [], inferenceOptions: [], auth: [] };
@@ -138,7 +139,8 @@ test('Responses adapter selects the first account model and omits unsupported le
   const client = await adapter.getClient(request);
   assert.deepEqual(await client.messages.create(prompt), { content: [{ type: 'text', text: '{"ok":true}' }], stop_reason: 'end_turn' });
   assert.deepEqual(calls.inference[0], {
-    model: 'account-first', input: prompt.messages, instructions: 'Return JSON.', store: false, stream: true,
+    model: 'account-first', input: [{ role: 'user', content: `${JSON_INSTRUCTION}\n\nA sample resume.` }],
+    instructions: `Return JSON.\n\n${JSON_INSTRUCTION}`, text: { format: { type: 'json_object' } }, store: false, stream: true,
   });
   assert.deepEqual(calls.client[0], { apiKey: 'test-account-token', baseURL: 'https://api.openai.com/v1', maxRetries: 0, timeout: 120000 });
 });
@@ -509,8 +511,8 @@ test('text blocks and prior assistant messages retain their roles without system
   const { adapter, calls } = fixture();
   const client = await adapter.getClient(request);
   await client.messages.create({ messages: [{ role: 'assistant', content: [{ type: 'text', text: 'First' }, { type: 'text', text: 'Second' }] }, { role: 'user', content: 'Continue.' }] });
-  assert.deepEqual(calls.inference[0].input, [{ role: 'assistant', content: 'First\nSecond' }, { role: 'user', content: 'Continue.' }]);
-  assert.equal('instructions' in calls.inference[0], false);
+  assert.deepEqual(calls.inference[0].input, [{ role: 'assistant', content: 'First\nSecond' }, { role: 'user', content: `${JSON_INSTRUCTION}\n\nContinue.` }]);
+  assert.equal(calls.inference[0].instructions, JSON_INSTRUCTION);
   await assert.rejects(client.messages.create({ messages: [{ role: 'system', content: 'Wrong role' }] }), { code: 'invalid_chatgpt_input' });
   assert.equal(calls.inference.length, 1);
 });

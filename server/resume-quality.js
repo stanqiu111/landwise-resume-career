@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { containsPhrase, normalizeText } from './text-match.js';
 
 const TailoredResultSchema = z.object({
   transformedResume: z.string().trim().min(80),
@@ -8,15 +9,12 @@ const TailoredResultSchema = z.object({
   improvements: z.array(z.string()).default([]),
 });
 
-const normalize = text => text.normalize('NFKC').replace(/[\s\u00a0]+/g, ' ').trim().toLowerCase();
-
-// A model-produced citation is usable only when its quoted evidence is in the source.
+// A model-produced citation is usable only when its quoted evidence is in the
+// source as whole words ("Java" does not count as found inside "JavaScript").
 export function groundClaims(claims, originalResume) {
-  const source = normalize(originalResume);
   const seen = new Set();
   return claims.filter(claim => {
-    const phrase = normalize(claim.raw_phrase);
-    if (!phrase || !source.includes(phrase) || seen.has(claim.id)) return false;
+    if (!normalizeText(claim.raw_phrase) || !containsPhrase(originalResume, claim.raw_phrase) || seen.has(claim.id)) return false;
     seen.add(claim.id);
     return true;
   }).map(claim => ({ ...claim, text: claim.raw_phrase }));

@@ -58,8 +58,19 @@ change the SQL, adapter constants, tests and docs together when changing policy.
 
 `resume-edits.js` applies valid replacements to original lines, preserving all
 other structure. At most 35% of recognized bullets, rounded up with a minimum
-allowance of one, may change. New/deleted/multiline bullets and changed source
-metrics are rejected. Text without recognized bullet markers stays unchanged.
+allowance of one, may change. `screenResumeEdits` checks each replacement on
+its own and drops, with a reason code only, any that targets a non-bullet or
+repeated line, is empty or multiline, grows more than 8 words, changes a source
+number, removes an email or link, adds a key term of an unsupported requirement,
+adds a named tool, technology, standard or credential of a requirement with only
+related evidence, adds a supported term to a bullet that does not hold that
+requirement's evidence, or exceeds the cap; the valid edits still apply. A
+replacement identical to its bullet is not counted as an edit. When an edit is
+dropped, "Edits made" is written by code from the kept edits. `text-match.js`
+compares quotes and terms as whole words with curly quotes and dashes folded, so
+"Java" is never found inside "JavaScript". Claims keep any type label, so a fact
+the model labels "education" is never dropped. Text without recognized bullet
+markers stays unchanged.
 `resume-quality.js` checks contact/education retention, numeric claims and other
 constraints; these checks do not prove every sentence's semantic truth.
 
@@ -72,7 +83,9 @@ reflow after edits/font substitution.
 
 `tailoring-report.js` derives the score from valid source evidence: must-have
 weight 2, nice-to-have weight 1; direct credit 1, related credit 0.5, absent 0.
-Placement quotations must occur in the final draft. Included, expand and learn
+Placement quotations must occur in the final draft; an edited evidence bullet is
+quoted from the draft line that replaced it (original and draft compared line by
+line) only while it still states the quoted fact. Included, expand and learn
 groups distinguish documented evidence from a skill the user may need to build.
 The score is not an ATS rating or hiring forecast.
 

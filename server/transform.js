@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { applyResumeEdits, editableResumeLines, rejectUnsupportedAdditions } from './resume-edits.js';
+import { applyResumeEdits, editableResumeLines, rejectUnsupportedAdditions, screenResumeEdits } from './resume-edits.js';
 import { buildTailoringReport } from './tailoring-report.js';
 import { validateClaims, validateRequirements, validateMatches } from './schemas.js';
 import { chunkResume, buildRetrievalIndex } from './rag.js';
@@ -84,21 +84,43 @@ Use only supplied IDs. Unsupported requirements must have empty claim_ids. Exact
   function validate() {
     let parsed;
     let response;
+    let dropped;
+    const bullets = editableResumeLines(resume);
     try {
       response = JSON.parse(message.content[0].text);
       if (!Array.isArray(response.edits)) throw new Error('Missing targeted edits.');
+      // An edit that returns its bullet unchanged is not a change: drop it so it
+      // neither uses the edit budget nor shows as a before/after pair. Malformed
+      // edits go on to the screen, which records them as invalid.
+      const bulletText = text => String(text).replace(/^\s*[-•*]\s+/, '').replace(/\s+/g, ' ').trim();
+      const proposed = response.edits.length;
+      response.edits = response.edits.filter(edit => {
+        const source = bullets.find(line => line.id === edit?.lineId);
+        return !source || typeof edit.replacement !== 'string' || bulletText(edit.replacement) !== bulletText(source.text);
+      });
+      // Drop individually invalid edits (reason codes kept) instead of failing the draft.
+      ({ kept: response.edits, dropped } = screenResumeEdits(resume, response.edits, jdRequirements, claimMatches, resumeClaims));
       const transformedResume = applyResumeEdits(resume, response.edits);
       rejectUnsupportedAdditions(resume, transformedResume, jdRequirements, claimMatches);
-      parsed = parseTailoredResult(JSON.stringify({ transformedResume, improvements: response.improvements || [] }), resume);
+      // The model's own summary describes every edit it proposed. If any were
+      // removed, "Edits made" is written from the kept edits instead, so it never
+      // mentions a change that is not in the draft.
+      const improvements = response.edits.length === proposed && Array.isArray(response.improvements)
+        ? response.improvements.filter(text => typeof text === 'string')
+        : response.edits.map(edit => {
+          const line = bullets.find(item => item.id === edit.lineId);
+          return `Revised a bullet under ${(line.context || line.section || 'your resume').split('|')[0].trim()}.`;
+        });
+      parsed = parseTailoredResult(JSON.stringify({ transformedResume, improvements }), resume);
     }
     catch { throw inputError('The tailored draft did not pass the completeness and accuracy checks. Please try transforming again.', 502, 'invalid_tailored_resume'); }
     const layout = layoutResume(parsed.transformedResume, maxPages);
     const report = buildTailoringReport(jdRequirements, claimMatches, resumeClaims, parsed.transformedResume,
-      Array.isArray(response.requirementFeedback) ? response.requirementFeedback : []);
+      Array.isArray(response.requirementFeedback) ? response.requirementFeedback : [], resume);
     return { ...parsed, ...claimAnalysis, matchScore: report.score, report,
       job: { company: jobDescription.toLowerCase().includes(analysis.company.toLowerCase()) ? analysis.company : '', roleTitle: analysis.roleTitle },
-      changes: response.edits.map(edit => ({ original: editableResumeLines(resume).find(line => line.id === edit.lineId).text, revised: edit.replacement })),
-      editCount: response.edits.length, pageLimit: maxPages, pageCount: layout.pageCount };
+      changes: response.edits.map(edit => ({ original: bullets.find(line => line.id === edit.lineId).text, revised: edit.replacement })),
+      editCount: response.edits.length, droppedEdits: dropped, pageLimit: maxPages, pageCount: layout.pageCount };
   }
   // Only a real overflow adds one bounded, sequential editing request. Never
   // truncate the draft, shrink below the readable styles, or silently add pages.

@@ -95,7 +95,7 @@ server/
   chatgpt-*.js                  Local-only ChatGPT authorization and inference
   transform.js, revise.js       Shared tailoring and follow-up pipelines
   transform-progress.js         Stage progress events; logs metadata only
-  resume-*.js, tailoring-report.js, rag.js, schemas.js, prompts.js
+  resume-*.js, tailoring-report.js, text-match.js, rag.js, schemas.js, prompts.js
                                 Evidence, limited edits, retrieval and validation
   application-store.js          Local files
   cloud-storage.js, supabase-applications.js

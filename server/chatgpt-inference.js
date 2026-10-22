@@ -3,6 +3,10 @@ import { withDeadline } from './request-deadline.js';
 import { AIRateLimitError, rateLimitError, retryDelaySeconds } from './ai-rate-limit.js';
 
 const API_BASE = 'https://api.openai.com/v1';
+// Every Landwise model call expects one JSON object. As in the hosted adapter,
+// request JSON mode and repeat the instruction in the input messages, which JSON
+// mode requires (instructions alone are not enough).
+const JSON_INSTRUCTION = 'Return one valid JSON object only. Do not include Markdown fences or text outside the JSON object.';
 const MANAGE_USAGE_URL = 'https://chatgpt.com/settings/usage';
 
 class ChatGPTInferenceError extends Error {
@@ -57,6 +61,12 @@ function providerError(error, status, headers = error?.headers) {
       if (httpStatus === 503) return new ChatGPTInferenceError('ChatGPT is temporarily unavailable. Please try again later.', 503, 'chatgpt_unavailable');
       return new ChatGPTInferenceError('The ChatGPT request could not be completed. Please try again.', 502, 'chatgpt_request_failed');
   }
+}
+
+function withJsonInstruction(input) {
+  const index = input.findIndex(message => message.role === 'user');
+  if (index < 0) return [...input, { role: 'user', content: JSON_INSTRUCTION }];
+  return input.map((message, position) => position === index ? { ...message, content: `${JSON_INSTRUCTION}\n\n${message.content}` } : message);
 }
 
 function toInput(messages) {
@@ -228,8 +238,9 @@ export function createChatGPTInference({
                 const client = createOpenAIClient({ apiKey: token, baseURL: API_BASE, maxRetries: 0, timeout: 120000 });
                 const stream = await client.responses.create({
                   model,
-                  input,
-                  ...(typeof system === 'string' && system ? { instructions: system } : {}),
+                  input: withJsonInstruction(input),
+                  instructions: typeof system === 'string' && system ? `${system}\n\n${JSON_INSTRUCTION}` : JSON_INSTRUCTION,
+                  text: { format: { type: 'json_object' } },
                   store: false,
                   stream: true,
                 }, { signal });

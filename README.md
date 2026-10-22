@@ -54,12 +54,14 @@ every gap.
   moved, and at most 35% of bullets, rounded up, change per run.
 - 🔎 **Evidence from your own words** — a fact counts as evidence only if its
   quote is found in your original resume. Requirements without evidence become
-  gaps to work on, and a draft that adds a key term listed for one of those
-  gaps is rejected. That check matches exact words, so a synonym can still slip
-  through.
+  gaps to work on, and an edit that adds a key term listed for one of those
+  gaps is thrown out, as is an edit that adds a named tool or credential, like
+  Kubernetes or a certification, to a bullet that doesn't already show it.
+  These checks match whole words, so a synonym can still slip through.
 - 🔢 **Your numbers stay yours** — each edited bullet keeps the numbers it
-  started with, and a draft with any new number is rejected. This covers
-  numbers written in digits, like 30% or 40, not numbers written as words.
+  started with, and an edit that adds, changes or drops a number is thrown
+  out. This covers numbers written in digits, like 30% or 40, not numbers
+  written as words.
 - 📊 **A fit report you can act on** — see which requirements your resume
   already shows, which to build on, and which to learn or prove first, with a
   next step for each. The match score is worked out by code from the AI's
@@ -109,10 +111,12 @@ you can change it. Then Landwise works in four steps:
 2. **Match.** Each requirement is linked to your quoted evidence as a direct
    match, a related one, or a gap.
 3. **Build.** The AI suggests edits to a few bullet points, aimed at the role.
-4. **Check.** Code applies the edits to your original resume and rejects the
-   draft if it breaks a rule, such as too many edits, changed numbers, dropping
-   an email or Education heading your original had, or adding key terms from
-   requirements you can't support. Then it lays out the pages. If the draft
+4. **Check.** Code checks each edit against your original resume and throws
+   out any that breaks a rule, such as going over the edit limit, changing a
+   number, growing by more than 8 words, or adding a key term from a
+   requirement you can't support. The other edits stay. A draft that would
+   drop an email or Education heading your original had is rejected. Then it
+   lays out the pages. If the draft
    runs long, Landwise asks the AI to shorten it once, and stops with an error
    if it still doesn't fit.
 
@@ -160,8 +164,9 @@ that fits the role. No account needed.
 
 ## Good to know
 
-- Checks compare text, not meaning. A short quote can match inside a longer
-  word ("Java" inside "JavaScript"). Only numbers written in digits are
+- Checks compare words, not meaning. Quotes and key terms must match whole
+  words, so "Java" is not found inside "JavaScript", but a synonym or a
+  rewording can still slip through. Only numbers written in digits are
   checked, not the words around them: "$1.5M" changed to "$1.5B" would pass,
   and a number written as a word, like "five", isn't checked at all. Read every
   draft before you send it.
