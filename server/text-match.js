@@ -51,12 +51,12 @@ const unitValue = word => SMALL_NUMBERS[word] ?? TENS[word];
 // Numbers in digits ("40+", "30%", "$1.5M", "2x", "1st") and in words ("three",
 // "seventy-five", "a dozen", "doubled", "hundreds of", "second place"), each as a
 // comparable token: "three" and "3" give the same token, "$1.5M" and "$1.5B" do
-// not. Each line is read on its own, and "one-on-one", "double-check" or
-// "first aid" are phrases, not numbers.
+// not. Each line is read on its own, and "one-on-one", "one another",
+// "double-check" or "first aid" are phrases, not numbers.
 export function numberTokens(text) {
   return String(text ?? '').split(/\r?\n/).flatMap(line => {
     const tokens = [];
-    const rest = normalizeText(line).replace(/\bone[- ]on[- ]one\b|\bdouble[- ]check\w*|\bfirst[- ](?:aid|responders?|hand)\b/g, ' , ')
+    const rest = normalizeText(line).replace(/\bone[- ]on[- ]one\b|\bone another\b|\bdouble[- ]check\w*|\bfirst[- ](?:aid|responders?|hand)\b/g, ' , ')
       .replace(/(\d+(?:[.,]\d+)*)(?:(st|nd|rd|th)\b|(x)\b|(k|mm|m|bn|b)\b|\s?(thousand|million|billion)\b)?(\s?(?:%|percent\b|per cent\b)|\+)?/g,
         (_match, digits, ordinal, times, letter, scale, suffix) => {
           const base = ordinal ? `#${digits}` : times ? `x${digits}` : `${digits}${MAGNITUDES[letter || scale] || ''}`;

@@ -75,6 +75,7 @@ test('numbers written in words or with M/B suffixes count like digits, but "thre
   ]);
   assert.equal(kept.length, 3, 'the 35% budget allows 3 of 8 bullets');
   assert.deepEqual(numberTokens('Certified in CPR and First Aid; first-hand experience with one-on-one care.'), []);
+  assert.deepEqual(numberTokens('Two programs that talk to one another.'), ['2']);
   assert.throws(() => applyResumeEdits(source, [{ lineId: 'line-4', replacement: 'Tutored seventy-five students in algebra each week.' }]), /metrics/);
 });
 
