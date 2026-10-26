@@ -59,7 +59,8 @@ where status = 'reserved' and created_at < clock_timestamp() - interval '6 minut
 
 ## Deployments and rollback
 
-Use a branch/PR for changes and run:
+Use a branch and pull request for every change, as in the
+[shipping guide](SHIPPING.md), and run:
 
 ```sh
 npm ci

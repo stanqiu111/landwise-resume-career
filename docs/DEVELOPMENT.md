@@ -17,6 +17,7 @@ setup and testing.
 | Run the local ChatGPT-connected studio | [Local development](LOCAL_DEVELOPMENT.md) |
 | Understand ownership, migrations, and interrupted AI jobs | [Supabase guide](SUPABASE.md) |
 | Change the pipeline or UI | [Architecture](../ARCHITECTURE.md) and [quality rules](../QUALITY.md) |
+| Ship a change: branch, checks, review, merge and rollback | [Shipping guide](SHIPPING.md) and [review guide](../REVIEW.md) |
 
 ## Hosting and costs
 
