@@ -53,7 +53,7 @@ request. "Done" without evidence is not done.
 | Change touches | Run and show |
 | --- | --- |
 | Anything | `npm run check`: secret scan, lint, all tests, hosted build, local build |
-| UI | Look at each changed screen at desktop and 390 px width with reduced motion on, and check hover, focus, active and disabled states together. Hosted screens after the input form (progress, result, fit report) cannot be reached locally without a real AI call; `npm run screenshots -- <folder>` renders them with a stand-in API, so check those images. |
+| UI | Look at each changed screen at desktop and 390 px width with reduced motion on, and check hover, focus, active and disabled states together. Hosted screens after the input form (progress, result, fit report) cannot be reached locally without a real AI call; `npm run screenshots -- <folder>` renders them with a stand-in API, so check those images. It covers desktop width only, without hover or focus states, so list those gaps under Testing. |
 | README images | `npm run screenshots`, then look at every image |
 | Resume pipeline: `server/transform.js`, `revise.js`, `resume-edits.js`, `resume-quality.js`, `tailoring-report.js`, `text-match.js`, `rag.js`, `prompts.js`, `schemas.js` | A test with synthetic resumes from `tests/fixtures` for the rule you changed; the rules are in [QUALITY.md](../QUALITY.md) |
 | Export or page layout: `src/resumeLayout.js`, `src/resumeDocx.js`, PDF export | Render a PDF and a DOCX from a synthetic resume; check both page counts and legibility |
@@ -161,8 +161,10 @@ Approval rules:
 - Run the checks in
   [after every deployment](OPERATIONS.md#regular-checks): the commit is Ready
   on Vercel, `npm run check:live`, the studio and career events at desktop and
-  phone width, Vercel logs, and a synthetic resume after generation or export
-  changes. Browsers cache icons hard, so use a hard refresh.
+  phone width, and Vercel logs. Browsers cache icons hard, so use a hard
+  refresh. The synthetic-resume run listed there after generation or export
+  changes is a real AI call that spends credit and guest allowance: the owner
+  does it, and agents only when the owner asks in that conversation.
 - Merging does not apply a database migration. Follow
   [migration and account setup](SUPABASE.md#migration-and-account-setup) for
   the order (some migrations need the new server deployed first), the check
@@ -205,8 +207,9 @@ then, the rules above are conventions, not enforced.
 - **Automated review in CI**, such as the Claude Code GitHub Action with
   security review. Adding the workflow file needs a GitHub connection with the
   `workflow` scope, which the current one lacks, and the Action needs an API key
-  stored as a repository secret. Follow SECURITY.md: a read-only token and
-  pinned action SHAs. The repository is public, so never run pull request code
+  stored as a repository secret. Follow SECURITY.md: least-privilege
+  permissions (`contents: read`, plus `pull-requests: write` to post comments)
+  and pinned action SHAs. The repository is public, so never run pull request code
   from forks with secrets.
 - **Merge queue, staged rollouts and broad feature flags** are not needed at
   current traffic. The hosted flags in use are listed in

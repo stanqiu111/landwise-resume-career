@@ -88,6 +88,9 @@ credentials. A browser-bundle preview alone has no working API.
 
 For a bad release, use Vercel's deployment controls to restore the **last tested
 hosted deployment**, and check its flags, configuration and API afterwards.
+On the Hobby plan, Vercel can roll back only to the immediately previous
+production deployment; if that one is not safe to restore, revert in Git and
+redeploy instead.
 Avoid old coming-soon preview deployments. Then revert the faulty change in
 Git and redeploy so the source and live state agree. Code rollback does not
 roll back Supabase migrations or restore deleted user data; plan additive,
