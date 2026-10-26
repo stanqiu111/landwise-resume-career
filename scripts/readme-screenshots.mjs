@@ -1,8 +1,9 @@
 // Recaptures the README screenshots in docs/images from an invented demo run.
 // The real hosted frontend runs against a stand-in API on loopback, so no AI
-// provider or account is called. Needs Google Chrome or Chromium;
-// set CHROME_PATH to use another binary. Pass a directory to write elsewhere.
+// provider or account is called. Needs Google Chrome or Chromium in a usual
+// install location, or CHROME_PATH. Pass a directory to write elsewhere.
 import { spawn } from 'node:child_process';
+import { existsSync, rmSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import { tmpdir } from 'node:os';
@@ -13,10 +14,13 @@ import { job, result, resume } from './readme-demo.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.resolve(root, process.argv[2] || 'docs/images');
-const chromePath = process.env.CHROME_PATH || {
-  darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-}[process.platform] || 'google-chrome';
+const { env } = process;
+const chromePath = env.CHROME_PATH || ({
+  darwin: ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium'],
+  win32: [env.LOCALAPPDATA, env.PROGRAMFILES, env['PROGRAMFILES(X86)']].filter(Boolean).map(base => path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe')),
+  linux: ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium'],
+}[process.platform] || []).find(candidate => existsSync(candidate));
+if (!chromePath) throw new Error('Could not find Chrome or Chromium. Set CHROME_PATH to the browser binary.');
 // Career events are sorted from downtown Toronto, where the demo student lives.
 const TORONTO = { latitude: 43.6532, longitude: -79.3832, accuracy: 100 };
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -63,34 +67,47 @@ function listen(server) {
   });
 }
 
-async function freePort() {
-  const server = http.createServer();
-  const port = await listen(server);
-  await new Promise(resolve => server.close(resolve));
-  return port;
-}
-
 async function launchChrome() {
   const profile = await mkdtemp(path.join(tmpdir(), 'landwise-screenshots-'));
   const chrome = spawn(chromePath, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--mute-audio', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-  const exited = new Promise(resolve => chrome.once('exit', resolve));
+  // A failed spawn emits only 'error', so treat it as an exit too.
+  const exited = new Promise(resolve => { chrome.once('exit', resolve); chrome.once('error', resolve); });
+  // Ctrl+C, SIGTERM (Vite exits on it) or a crash skip the async cleanup; exit handlers must be synchronous.
+  const forceClose = () => { chrome.kill('SIGKILL'); rmSync(profile, { recursive: true, force: true, maxRetries: 3 }); };
+  process.once('exit', forceClose);
+  async function close() {
+    process.off('exit', forceClose);
+    if (chrome.pid && chrome.exitCode === null && chrome.signalCode === null) {
+      chrome.kill();
+      const graceful = await Promise.race([exited.then(() => true), new Promise(resolve => setTimeout(resolve, 5000, false).unref())]);
+      if (!graceful) {
+        chrome.kill('SIGKILL');
+        await exited;
+      }
+    }
+    await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+  let timer;
   try {
     const endpoint = await new Promise((resolve, reject) => {
-      let output = '';
+      timer = setTimeout(() => reject(new Error('Chrome did not open its DevTools port within 30 seconds.')), 30000);
       chrome.once('error', () => reject(new Error(`Could not start Chrome at ${chromePath}. Set CHROME_PATH to a Chrome or Chromium binary.`)));
       exited.then(code => reject(new Error(`Chrome exited early (${code}).`)));
+      let output = '';
       chrome.stderr.on('data', chunk => {
+        if (output === null) return; // Keep draining so Chrome never blocks on a full pipe.
         output += chunk;
         const match = output.match(/DevTools listening on (ws:\/\/\S+)/);
-        if (match) resolve(match[1]);
+        if (match) { output = null; resolve(match[1]); }
       });
     });
-    return { endpoint, async close() { chrome.kill(); await exited; await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } };
+    return { endpoint, close };
   } catch (error) {
-    chrome.kill();
-    await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    await close();
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -103,6 +120,11 @@ async function connect(endpoint) {
   });
   let nextId = 0;
   const pending = new Map();
+  // Fail every waiting command if Chrome goes away, instead of hanging.
+  socket.onclose = () => {
+    for (const request of pending.values()) request.reject(new Error(`${request.method}: Chrome closed the DevTools connection.`));
+    pending.clear();
+  };
   socket.onmessage = ({ data }) => {
     const message = JSON.parse(data);
     const request = pending.get(message.id);
@@ -112,11 +134,17 @@ async function connect(endpoint) {
     else request.resolve(message.result);
   };
   return {
-    send: (method, params = {}, sessionId) => new Promise((resolve, reject) => {
-      const id = ++nextId;
-      pending.set(id, { method, resolve, reject });
-      socket.send(JSON.stringify({ id, method, params, sessionId }));
-    }),
+    send(method, params = {}, sessionId) {
+      if (socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error(`${method}: Chrome is not connected.`));
+      return new Promise((resolve, reject) => {
+        const id = ++nextId;
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error(`${method}: no reply from Chrome within 30 seconds.`)); }, 30000);
+        const settle = callback => value => { clearTimeout(timer); callback(value); };
+        pending.set(id, { method, resolve: settle(resolve), reject: settle(reject) });
+        socket.send(JSON.stringify({ id, method, params, sessionId }));
+      });
+    },
+    connected: () => socket.readyState === WebSocket.OPEN,
     close: () => socket.close(),
   };
 }
@@ -135,12 +163,21 @@ async function openPage(cdp, origin) {
   }
   return {
     evaluate,
+    // Keeps polling through transient errors such as a page reload, up to the deadline.
     async waitFor(expression, timeout = 15000) {
       const deadline = Date.now() + timeout;
-      while (!await evaluate(`Boolean(${expression})`)) {
-        if (Date.now() > deadline) throw new Error(`Timed out waiting for: ${expression}`);
+      let lastError;
+      while (Date.now() < deadline) {
+        try {
+          if (await evaluate(`Boolean(${expression})`)) return;
+          lastError = null;
+        } catch (error) {
+          if (!cdp.connected()) throw error;
+          lastError = error;
+        }
         await pause(100);
       }
+      throw new Error(`Timed out waiting for: ${expression}${lastError ? ` (${lastError.message})` : ''}`);
     },
     goto: url => send('Page.navigate', { url }),
     // Crops are measured at scroll 0 inside a tall viewport, so page and viewport coordinates match.
@@ -213,27 +250,36 @@ async function captureEvents(page, origin) {
   await page.screenshot('career-events', { x: 0, y: directory.y + 6, width: 1324, height: 1063 });
 }
 
+// Exit (rather than die) on Ctrl+C or SIGTERM so the exit hook in launchChrome runs.
+process.once('SIGINT', () => process.exit(130));
+process.once('SIGTERM', () => process.exit(143));
+
 await mkdir(outDir, { recursive: true });
 const api = mockApi();
 const apiPort = await listen(api.server);
-process.env.VITE_LANDWISE_HOSTED = 'true';
+env.VITE_LANDWISE_HOSTED = 'true';
 const vite = await createServer({
   root, logLevel: 'error',
-  server: { host: '127.0.0.1', port: await freePort(), strictPort: true, proxy: { '/api': `http://127.0.0.1:${apiPort}` } },
+  server: { host: '127.0.0.1', port: 0, strictPort: true, proxy: { '/api': `http://127.0.0.1:${apiPort}` } },
 });
 let chrome, cdp;
 try {
   await vite.listen();
-  const origin = `http://127.0.0.1:${vite.config.server.port}`;
+  const origin = `http://127.0.0.1:${vite.httpServer.address().port}`;
   chrome = await launchChrome();
   cdp = await connect(chrome.endpoint);
   const page = await openPage(cdp, origin);
   await captureStudio(page, origin, api);
   await captureEvents(page, origin);
 } finally {
-  cdp?.close();
-  await chrome?.close();
-  await vite.close();
-  api.server.closeAllConnections();
-  await new Promise(resolve => api.server.close(resolve));
+  // Each step runs even if an earlier one fails.
+  for (const step of [
+    () => cdp?.send('Browser.close').catch(() => {}),
+    () => cdp?.close(),
+    () => chrome?.close(),
+    () => vite.close(),
+    () => { api.server.closeAllConnections(); return new Promise(resolve => api.server.close(resolve)); },
+  ]) {
+    try { await step(); } catch (error) { console.warn(`Cleanup: ${error.message}`); }
+  }
 }

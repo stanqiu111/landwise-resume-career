@@ -120,10 +120,10 @@ Transform as an automated availability probe.
 
 `npm run screenshots` recaptures the README images in `docs/images`. It runs
 the hosted frontend against a stand-in API with the invented student and job in
-`scripts/readme-demo.mjs`, so it makes no AI or account calls. It needs
-Google Chrome or Chromium; set `CHROME_PATH` to use another browser binary, or
-pass a folder (`npm run screenshots -- /tmp/shots`) to preview without
-overwriting. Career events reflect today's date, so that image changes as
+`scripts/readme-demo.mjs`, so it makes no AI or account calls. It looks for
+Google Chrome or Chromium in the usual install locations; set `CHROME_PATH` to
+use another browser binary. Pass a folder (`npm run screenshots -- /tmp/shots`)
+to preview without overwriting. Career events reflect today's date, so that image changes as
 events pass.
 
 `npm run clean` removes only known generated output/cache directories rooted in
