@@ -16,7 +16,8 @@ async function inspect(directory) {
         if (source.includes(value)) throw new Error(`Server credential reference in hosted output: ${filename}`);
       }
       if (/(?:sb_secret_|sk-(?:proj|svcacct)-)[A-Za-z0-9_-]{20,}/.test(source)) throw new Error(`Secret-shaped value in hosted output: ${filename}`);
-    } else throw new Error(`Unexpected hosted build file: ${filename}`);
+      // Self-hosted fonts are binary files from the font packages; the CSP only allows fonts from this site.
+    } else if (!/\.woff2?$/.test(entry.name)) throw new Error(`Unexpected hosted build file: ${filename}`);
   }
 }
 await inspect('dist-hosted');
