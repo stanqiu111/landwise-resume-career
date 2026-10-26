@@ -17,8 +17,9 @@ our own words:
 - **Most review happens before the pull request.** The author, human or agent,
   proves the change works by running something (tests, a build, a screenshot)
   and has the diff reviewed with fresh context before asking anyone else.
-- **Every pull request gets an automated review**, and its findings must be
-  fixed or answered before merging. Pure style comments are filtered out.
+- **An agent reviews every pull request before a person does**, and every
+  finding is fixed or answered before merging. Here the author's agent runs
+  that review; see [not yet set up](#not-yet-set-up).
 - **Human attention is scaled by risk.** The change, not the author, sets the
   tier. Agent approvals never stand in for a required human approval.
 - **Review must converge.** An agent author and an agent reviewer can loop
@@ -52,15 +53,24 @@ request. "Done" without evidence is not done.
 | Change touches | Run and show |
 | --- | --- |
 | Anything | `npm run check`: secret scan, lint, all tests, hosted build, local build |
-| UI | Open the changed screen at desktop and 390 px width, with reduced motion on; check hover, focus, active and disabled states. Hosted-only UI needs `VITE_LANDWISE_HOSTED=true`. |
-| README images or visible UI shown in them | `npm run screenshots`, then look at every image |
-| Resume pipeline (`server/transform.js`, `revise.js`, `resume-*.js`, `tailoring-report.js`, `prompts.js`, `schemas.js`) | A test with synthetic resumes in `tests/fixtures` for the rule you changed; the rules are in [QUALITY.md](../QUALITY.md) |
+| UI | Look at each changed screen at desktop and 390 px width with reduced motion on, and check hover, focus, active and disabled states together. Hosted screens after the input form (progress, result, fit report) cannot be reached locally without a real AI call; `npm run screenshots -- <folder>` renders them with a stand-in API, so check those images. |
+| README images | `npm run screenshots`, then look at every image |
+| Resume pipeline: `server/transform.js`, `revise.js`, `resume-edits.js`, `resume-quality.js`, `tailoring-report.js`, `text-match.js`, `rag.js`, `prompts.js`, `schemas.js` | A test with synthetic resumes from `tests/fixtures` for the rule you changed; the rules are in [QUALITY.md](../QUALITY.md) |
+| Export or page layout: `src/resumeLayout.js`, `src/resumeDocx.js`, PDF export | Render a PDF and a DOCX from a synthetic resume; check both page counts and legibility |
 | Hosted API, limits, auth or storage | Tests in `tests/` for the new behavior, including the failure path |
 | Dependencies | `npm audit`, release notes for behavior changes between the old and new versions, and `npm ci` accepting the lockfile |
 
+If you could not check something, say so in the pull request's Testing
+section: which screen or case, and why.
+
 Never use real resumes, real people or production AI calls as tests. Automated
-tests mock the AI provider. If `npm run dev` servers are already running on
-5174 and 3001, they belong to someone else: use other ports.
+tests mock the AI provider.
+
+If the owner's `npm run dev` servers are already running on 5174 and 3001,
+do not stop or restart them. A second copy needs a different Vite port and API
+port changed together (see
+[local development](LOCAL_DEVELOPMENT.md#start-and-stop)); if
+that is not set up, ask the owner instead of editing `vite.config.js`.
 
 ### 4. Review before the pull request
 
@@ -75,7 +85,8 @@ Push the branch and open a pull request against `main`. The template asks for:
 
 - **What and why**, in a few sentences.
 - **Risk tier** (below) and the reason.
-- **Testing**: the commands you ran with their results, and screenshots for UI.
+- **Testing**: the commands you ran with their results, screenshots for UI,
+  and anything you could not check.
 - **How to revert**, including anything a code revert does not undo, such as a
   database migration.
 
@@ -91,50 +102,82 @@ gates production: a failing `main` build never replaces the live site.
 
 ### 7. Code review on the pull request
 
-Every pull request gets a review recorded as a comment on it, in the format in
-[REVIEW.md](../REVIEW.md): a verdict, a count, and each finding with severity,
-`file:line`, what goes wrong, and a suggested fix.
+Every pull request gets a review posted as a comment on it, following
+[REVIEW.md](../REVIEW.md) for what to look for and how to report it.
 
 - Verify findings before reporting them; drop the ones that do not hold up.
 - Every finding is closed by a fix commit or by a short reason in the thread.
   Pre-existing findings do not block.
 - High-risk changes also get a security-focused review.
-- **Convergence:** at most three review rounds. After the first round, review
-  only the new commits, name the class of bug so every instance gets fixed, and
-  do not raise findings again that were fixed or answered. If round three
-  still finds problems, rethink the approach instead of patching.
+- Review rounds are limited (REVIEW.md). If the third round still finds
+  problems, rethink the approach instead of patching.
 
 ### 8. Approval, scaled by risk
 
-The tier comes from what the change touches. When a change spans tiers, the
+The tier comes from what the change touches; when a change spans tiers, the
 highest applies.
 
-| Tier | Typical paths | Before merging |
-| --- | --- | --- |
-| **High** | Spending and abuse limits (`server/hosted-budget.js`, `openai-inference.js`, `ai-rate-limit.js`); identity and data access (`hosted-security.js`, `supabase-applications.js`, `cloud-storage.js`, `chatgpt-auth.js`, `src/cloudAccount.js`, `src/useLandwiseAccount.js`); request handling (`hosted-app.js`, `api/index.js`, `hosted-pdf*.js`, `request-deadline.js`); `supabase/`; build and guards (`vercel.json`, `scripts/build-hosted.mjs`, `scripts/secret-scan.mjs`, `.githooks/`, `.github/`); new dependencies or major versions; the resume pipeline's truth rules | The owner reads the diff and the evidence. Security review. A migration must be additive and work with the deployed server. |
-| **Medium** | Frontend logic (`src/**/*.js`, `*.jsx`), the local server, other scripts, tests, minor or patch dependency updates, UI copy about limits, privacy or saving | Clean review, green checks, and the owner looks over the evidence. |
-| **Low** | Docs, README, images, CSS-only styling, wording that makes no promises | Clean review and green checks. |
+**High**: the owner reads the diff and the evidence, and a security review runs.
+
+- Spending and abuse limits: `server/hosted-budget.js`, `openai-inference.js`,
+  `ai-rate-limit.js`.
+- Identity, sessions and stored data: `server/hosted-security.js`,
+  `supabase-applications.js`, `cloud-storage.js`, `application-store.js`,
+  `chatgpt-auth.js`, `src/cloudAccount.js`, `src/useLandwiseAccount.js`.
+- Request handling and network binding: `server/hosted-app.js`, `api/index.js`,
+  `server.js`, `server/hosted-pdf.js`, `hosted-pdf-worker.js`,
+  `request-deadline.js`, `vite.config.js`.
+- The database: everything in `supabase/`. A migration must be additive and
+  work with the deployed server.
+- Build, deploy and guards: `vercel.json` (including the CSP), the `scripts`
+  in `package.json`, `scripts/build-hosted.mjs`, `scripts/secret-scan.mjs`,
+  `.gitleaks.toml`, `.githooks/`, `.github/`.
+- New dependencies or new major versions.
+- The resume pipeline and export files listed in step 3.
+
+Any other file in `server/` or `api/` is Medium, or High if it handles
+requests, money, identity or stored data.
+
+**Medium**: a clean review, green checks, and the owner looks over the evidence.
+
+- Frontend logic (`src/**/*.js`, `*.jsx`), other scripts, tests, minor or patch
+  dependency updates.
+- Any docs or UI copy that states limits, prices, privacy, what is saved, or
+  timings.
+
+**Low**: a clean review and green checks.
+
+- Other docs, README images, CSS-only styling, wording that makes no promises.
+
+Approval rules:
 
 - An agent's approval never counts as the human approval.
-- A review covers the commits it saw. New commits need the new diff reviewed.
+- A review covers the commits it saw; new commits need the new diff reviewed.
 - Agents do not merge. The owner merges, unless they ask for it in that
   conversation.
 
 ### 9. After merging
 
-- Confirm the production deployment on Vercel reached Ready.
-- Run `npm run check:live`. It is read-only and makes no AI call.
-- Look at the changed page on the live site. Browsers cache icons hard, so use
-  a hard refresh.
+- Run the checks in
+  [after every deployment](OPERATIONS.md#regular-checks): the commit is Ready
+  on Vercel, `npm run check:live`, the studio and career events at desktop and
+  phone width, Vercel logs, and a synthetic resume after generation or export
+  changes. Browsers cache icons hard, so use a hard refresh.
+- Merging does not apply a database migration. Follow
+  [migration and account setup](SUPABASE.md#migration-and-account-setup) for
+  the order (some migrations need the new server deployed first), the check
+  queries, and recording the file's SHA-256 in
+  [DEPLOYMENT.md](DEPLOYMENT.md#applied-migrations).
 - Delete the merged branch.
 
 ### 10. When something goes wrong
 
-Restore the last good deployment in Vercel, then revert the change through a
-pull request so the code and the live site agree. A code revert does not undo
-a Supabase migration or restore deleted data; see
-[deployments and rollback](OPERATIONS.md#deployments-and-rollback). To stop AI
-spending quickly, set `LANDWISE_HOSTED_AI_ENABLED=false` and redeploy.
+Follow [deployments and rollback](OPERATIONS.md#deployments-and-rollback). Its
+cautions matter: restore the last tested hosted deployment and check its flags
+and configuration, and never restore one from before a migration it cannot
+work with (the guest-trial migration needs its down script first). A code
+revert does not undo a migration or restore deleted data. To stop new AI work
+quickly, set `LANDWISE_HOSTED_AI_ENABLED=false` and redeploy.
 
 The person who landed the change usually fixes it, because they have the most
 context. Then ask which layer should have caught it, and add a regression test,
@@ -150,17 +193,22 @@ answers for everything that ships.
 
 ## Not yet set up
 
-These parts of the process need owner action outside the repository:
+These parts of the process need owner action outside the repository. Until
+then, the rules above are conventions, not enforced.
 
 - **Branch protection on `main`** (repository settings, Rules): require a pull
-  request, the Vercel check and the code owner's review from
-  [CODEOWNERS](../.github/CODEOWNERS); dismiss approvals when new commits are
-  pushed; require all conversations to be resolved; block force pushes. Until
-  then these rules are conventions, not enforced.
+  request before merging, the Vercel status check, resolved conversations, and
+  block force pushes and deletion. Leave required approvals at 0 or give the
+  owner a bypass: GitHub does not let the only owner approve their own pull
+  request, so the owner's review stays a convention until there is a second
+  reviewer (see [SECURITY.md](../SECURITY.md)).
 - **Automated review in CI**, such as the Claude Code GitHub Action with
-  security review. It needs a GitHub token with the `workflow` scope and an API
-  key stored as a repository secret. The current GitHub connection cannot create
-  workflow files, so reviews are run by the author's agent and posted as
-  comments.
+  security review. Adding the workflow file needs a GitHub connection with the
+  `workflow` scope, which the current one lacks, and the Action needs an API key
+  stored as a repository secret. Follow SECURITY.md: a read-only token and
+  pinned action SHAs. The repository is public, so never run pull request code
+  from forks with secrets.
 - **Merge queue, staged rollouts and broad feature flags** are not needed at
-  current traffic. The hosted AI switch above is the one flag in use.
+  current traffic. The hosted flags in use are listed in
+  [DEPLOYMENT.md](DEPLOYMENT.md): `LANDWISE_HOSTED_AI_ENABLED` and
+  `LANDWISE_ACCOUNT_SIGN_IN_ENABLED`.

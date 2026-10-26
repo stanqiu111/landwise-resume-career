@@ -53,8 +53,8 @@ Look for these first. They matter far more than style.
 
 ## Lessons from escaped bugs
 
-Each entry is a bug that got past review. Check new changes for the same
-pattern.
+Each entry is a bug that reached `main` or production. Check new changes for
+the same pattern.
 
 - **2026-10-26, failed production deploy.** The restyle added self-hosted font
   files, and the hosted build check only allowed HTML, JS, CSS and SVG, so the
