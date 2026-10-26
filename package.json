@@ -37,12 +37,12 @@
     "express": "^5.2.1",
     "jose": "^6.2.12",
     "jspdf": "^4.2.1",
-    "multer": "^2.1.1",
+    "multer": "^2.5.0",
     "openai": "^6.42.0",
     "pdf-parse": "^2.4.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.10",
