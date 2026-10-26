@@ -20,6 +20,7 @@
     "security:history": "node scripts/secret-scan.mjs --history",
     "check": "npm run verify:hosted && npm run build",
     "check:live": "node scripts/check-live.mjs",
+    "screenshots": "node scripts/readme-screenshots.mjs",
     "clean": "node scripts/clean.mjs",
     "lint": "eslint .",
     "test": "node --test",

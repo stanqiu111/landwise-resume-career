@@ -17,6 +17,7 @@ setup and testing.
 | Run the local ChatGPT-connected studio | [Local development](LOCAL_DEVELOPMENT.md) |
 | Understand ownership, migrations, and interrupted AI jobs | [Supabase guide](SUPABASE.md) |
 | Change the pipeline or UI | [Architecture](../ARCHITECTURE.md) and [quality rules](../QUALITY.md) |
+| Ship a change: branch, checks, review, merge and rollback | [Shipping guide](SHIPPING.md) and [review guide](../REVIEW.md) |
 
 ## Hosting and costs
 
@@ -72,6 +73,7 @@ local workflow. See [local setup and credentials](LOCAL_DEVELOPMENT.md).
 | `npm run build` | Local studio browser bundle in `dist` |
 | `npm run preview:hosted` | Static hosted-bundle preview only; no API or server secrets |
 | `npm run check:live` | Hosted health, session/ledger, and public storage configuration checks; no AI generation |
+| `npm run screenshots` | Rebuild the README images from the invented demo; no AI, account or database |
 | `npm run clean` | Remove generated builds and Vercel build caches; preserve configuration, credentials, dependencies, and saved applications |
 
 Automated tests use mocked provider calls and a local PGlite PostgreSQL engine;
@@ -134,13 +136,13 @@ date. Listings are not fetched automatically; review them regularly.
 
 ## README screenshots
 
-The images in `docs/images/` were captured with a local harness (not in this
-repository) that served the hosted interface with a scripted model and an
-in-memory budget, so no provider call, allowance or database was used. The
-resume, school, employer and job are invented, and the email uses the reserved
-`example.com` domain. If you retake them, use invented data and a setup with no
-production credentials. Never capture the live site, a real resume or account
-data for the README.
+`npm run screenshots` rebuilds the images in `docs/images/`. It serves the
+hosted interface against a stand-in API on loopback with the scripted demo in
+`scripts/readme-demo.mjs`, so no provider call, allowance or database is used.
+The resume, school, employer and job are invented, and the email uses the
+reserved `example.com` domain. Look at every image before committing. Never
+capture the live site, a real resume or account data for the README; see
+[local development](LOCAL_DEVELOPMENT.md#builds-and-checks) for options.
 
 ## Repository hygiene
 

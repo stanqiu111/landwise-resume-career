@@ -203,7 +203,7 @@ commands, project structure and hosting costs are in the
 [Architecture](ARCHITECTURE.md) · [Quality rules](QUALITY.md) ·
 [Security](SECURITY.md) · [Operations](docs/OPERATIONS.md) ·
 [Deployment](docs/DEPLOYMENT.md) · [Local studio](docs/LOCAL_DEVELOPMENT.md) ·
-[Supabase](docs/SUPABASE.md)
+[Supabase](docs/SUPABASE.md) · [Shipping changes](docs/SHIPPING.md)
 
 ## License
 
