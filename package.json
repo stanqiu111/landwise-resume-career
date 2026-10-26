@@ -27,6 +27,9 @@
     "preview:hosted": "vite preview --outDir dist-hosted"
   },
   "dependencies": {
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.3.0",
+    "@fontsource/space-mono": "^5.3.0",
     "@supabase/supabase-js": "^2.118.0",
     "concurrently": "^10.0.3",
     "docx": "^9.7.1",

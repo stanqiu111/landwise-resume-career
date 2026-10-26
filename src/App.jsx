@@ -7,6 +7,7 @@ import ResumeFollowUp from './components/ResumeFollowUp';
 import CareerEvents from './components/CareerEvents';
 import AIConnection from './components/AIConnection';
 import LandwiseAccount from './components/LandwiseAccount';
+import FlapText from './components/FlapText';
 import useLandwiseAccount from './useLandwiseAccount';
 import useAIConnection from './useAIConnection';
 import useHostedConnection from './useHostedConnection';
@@ -383,10 +384,10 @@ function Workspace({ account, connection, hosted = false, guestDraft, onPrepareG
 
       <header className="app-header">
         <a className="header-left" href="#resume" aria-label="Landwise resume studio">
-          <span className="header-logo" aria-hidden="true">L<span /></span>
+          <span className="header-logo" aria-hidden="true"><span /></span>
           <div className="header-title-wrap">
-            <span className="header-wordmark">landwise<span>.</span></span>
-            <span className="header-sub">A little clarity. Your next opportunity.</span>
+            <span className="header-wordmark">Landwise<span>.</span></span>
+            <span className="header-sub">Next stop: your first job</span>
           </div>
         </a>
         <nav className="primary-nav" aria-label="Main navigation">
@@ -407,10 +408,10 @@ function Workspace({ account, connection, hosted = false, guestDraft, onPrepareG
           <div className="studio-hero">
             <div className="studio-intro">
               <p className="studio-eyebrow">Built around your experience</p>
-              <h1>Your resume. A better fit.</h1>
+              <FlapText as="h1" text="Your resume. A better fit." />
               <p className="studio-description">Small edits to your real experience. A clearer fit, a learning plan, and your next step.</p>
             </div>
-            <ol className="studio-steps" aria-label="Resume tailoring steps">
+            <ol className={`studio-steps${loading ? ' is-moving' : ''}`} aria-label="Resume tailoring steps" style={{ '--stage': loading ? 1 : result ? 2 : 0 }}>
               {[['01', 'Add details'], ['02', 'Tailor'], ['03', 'Review & export']].map(([number, label], index) => (
                 <li key={number} aria-current={index === (loading ? 1 : result ? 2 : 0) ? 'step' : undefined}>
                   <span>{number}</span>{label}

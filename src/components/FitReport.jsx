@@ -1,3 +1,7 @@
+import FlapText from './FlapText';
+
+const STAMPS = { included: 'Cleared', expand: 'Add evidence', learn: 'Learn next' };
+
 const GROUPS = [
   ['included', 'Already shown in your resume', 'Direct evidence is present in the draft. Prepare to explain your contribution at interview.'],
   ['expand', 'Build on your existing experience', 'Related evidence exists. Strengthen it with accurate detail, practice or a clearer example.'],
@@ -9,7 +13,7 @@ export default function FitReport({ result }) {
   if (!report) return <p className="analysis-note">This older draft has no detailed fit report. Tailor it again to create one.</p>;
   return <div className="fit-report">
     <div className="result-match">
-      <span className="result-match-number">{report.score}<small>/100</small></span>
+      <span className="result-match-number"><FlapText text={String(report.score)} key={report.score} /><small>/100</small></span>
       <div><strong>Job match estimate</strong><span>{result.job?.roleTitle}{result.job?.company ? ` · ${result.job.company}` : ''}</span></div>
     </div>
     <p className="analysis-note">{report.scoreExplanation}</p>
@@ -17,7 +21,7 @@ export default function FitReport({ result }) {
     {GROUPS.map(([status, title, description]) => {
       const items = report.items.filter(item => item.status === status);
       return <details className={`fit-group fit-${status}`} key={status} open={status !== 'included'}>
-        <summary><h3>{title} <span>{items.length}</span></h3></summary>
+        <summary><h3><span className="fit-stamp" aria-hidden="true">{STAMPS[status]}</span>{title} <span>{items.length}</span></h3></summary>
         <p className="analysis-note">{description}</p>
         {items.length ? items.map(item => <article className="fit-item" key={item.id}>
           <div className="fit-item-heading"><h4>{item.requirement}</h4><span>{item.priority === 'must_have' ? 'Required' : 'Preferred'}</span></div>

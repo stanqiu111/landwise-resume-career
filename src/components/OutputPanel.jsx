@@ -5,6 +5,7 @@ import ClaimCoverage from './ClaimCoverage';
 import FitReport from './FitReport';
 import UnsupportedRequirements from './UnsupportedRequirements';
 import TransformActivity from './TransformActivity';
+import FlapText from './FlapText';
 import { parseResumeLines } from '../resumeDocument';
 import './OutputPanel.css';
 
@@ -182,7 +183,10 @@ export default function OutputPanel({ result, loading, progress, error, retryIn 
       {loading && <TransformActivity progress={progress} hosted={hosted} />}
 
       {!loading && !hasResult && <div className="result-empty">
-        <div className="result-empty-paper" aria-hidden="true"><span /><span /><span /><span /><span /></div>
+        <div className="result-empty-board" aria-hidden="true">
+          <FlapText text={error ? 'Delayed' : 'Next: your draft'} key={error ? 'delayed' : 'next'} />
+          <div className="result-empty-route"><span>RESUME</span><i /><span>THE ROLE</span></div>
+        </div>
         <h3>{error ? 'Your details are still here.' : 'A clearer resume starts here.'}</h3>
         <p>{error ? 'Review the message above, then try tailoring again.' : 'Add your resume and a job description. Your tailored draft will appear here.'}</p>
         <span>Review your draft before applying.</span>

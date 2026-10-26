@@ -1,19 +1,25 @@
-.hosted-access { display: grid; gap: 11px; padding: 18px; border: 1px solid #dce4f3; border-radius: 7px; background: #f7f9fe; }
-.hosted-access-label { display: inline-block; margin-bottom: 7px; color: #62759c; font-size: var(--text-xs); font-weight: 600; }
-.hosted-access h3 { margin: 0 0 8px; color: #293752; font-size: var(--text-lead); font-weight: 600; line-height: 1.5; }
-.hosted-access p { margin: 0; color: #576681; font-size: var(--text-sm); line-height: 1.7; }
-.hosted-access p.hosted-access-detail { color: #6b778b; font-size: var(--text-xs); }
-.hosted-access p.hosted-access-error { padding: 10px; border-radius: 4px; background: #fff1f3; color: #8d2f35; }
+.hosted-access { display: grid; gap: 11px; padding: 18px; border-radius: 12px; background: var(--paper-white); border: 1.5px solid var(--border); color: var(--text); }
+.hosted-access-label { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 8px; padding: 4px 9px; border-radius: 6px; background: var(--text); color: var(--amber); font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.hosted-access h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: var(--text-card); font-weight: 800; letter-spacing: .02em; text-transform: uppercase; line-height: 1.15; }
+.hosted-access p { margin: 0; color: var(--text-dim); font-size: var(--text-sm); line-height: 1.7; }
+.hosted-access p.hosted-access-detail { color: var(--text-muted); font-size: var(--text-xs); }
+.hosted-access p.hosted-access-error { padding: 10px; border-radius: 8px; background: #fff1ee; color: var(--error); }
 .hosted-access-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.hosted-access-actions button, .hosted-access-actions a, .hosted-header-account, .hosted-handoff button { min-height: 36px; padding: 8px 11px; border: 1px solid #d5deef; border-radius: 5px; background: #fff; color: #3b5797; font-size: var(--text-xs); line-height: 1.5; text-decoration: none; cursor: pointer; }
-.hosted-access-actions button:hover, .hosted-access-actions a:hover, .hosted-header-account:hover, .hosted-handoff button:hover { background: #eef3ff; }
-.hosted-handoff { margin-bottom: 25px; padding: 20px; border: 1px solid #ccd9f5; border-radius: 7px; background: #f5f8ff; }
-.hosted-handoff h2 { margin: 0 0 8px; font-size: var(--text-lead); line-height: 1.5; }
-.hosted-handoff p { margin: 0 0 12px; color: #5e6e89; font-size: var(--text-sm); line-height: 1.7; }
+.hosted-access-actions button, .hosted-access-actions a, .hosted-handoff button { min-height: 40px; padding: 9px 13px; border: 1.5px solid var(--border-bright); border-radius: 10px; background: var(--paper-white); color: var(--text); font-family: var(--font-display); font-size: var(--text-control); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; line-height: 1.4; text-decoration: none; cursor: pointer; transition: border-color .2s, transform .25s cubic-bezier(.3, 1.6, .4, 1); }
+.hosted-access-actions button:hover, .hosted-access-actions a:hover, .hosted-handoff button:hover { border-color: var(--text); transform: translateY(-2px); }
+.hosted-header-account { min-height: 40px; padding: 9px 15px; border: 0; border-radius: 10px; background: var(--amber); color: var(--amber-ink); font-family: var(--font-display); font-size: var(--text-control); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; transition: background .2s, transform .3s cubic-bezier(.3, 1.7, .4, 1); }
+.hosted-header-account:hover { background: var(--amber-hover); transform: translateY(-2px); }
+.hosted-handoff { margin-bottom: 25px; padding: 22px; border-radius: 16px; background: var(--surface); color: var(--text); box-shadow: var(--shadow-md); }
+.hosted-handoff h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: var(--text-card); font-weight: 800; text-transform: uppercase; line-height: 1.2; }
+.hosted-handoff p { margin: 0 0 12px; color: var(--text-dim); font-size: var(--text-sm); line-height: 1.7; }
 .hosted-handoff button + button { margin-left: 8px; }
-.hosted-signup-after-result { padding: 20px; border-top: 1px solid var(--border); background: #fff; }
-.hosted-signup-after-result .landwise-account { margin: 0; padding: 18px; }
+.hosted-handoff button:first-of-type { border-color: var(--amber); background: var(--amber); color: var(--amber-ink); }
+.hosted-signup-after-result { padding: 20px; border-top: 2px dashed var(--border); background: var(--surface); }
+.hosted-signup-after-result .landwise-account { margin: 0; padding: 18px; box-shadow: none; border: 1.5px solid var(--border); background: var(--paper-white); }
 .hosted-signup-after-result .landwise-account-form { min-width: 0; flex-basis: 100%; }
 .hosted-signup-after-result .landwise-account-form > div { flex-wrap: wrap; }
 .hosted-signup-after-result .landwise-account-form button { white-space: normal; }
 @media (max-width: 600px) { .hosted-signup-after-result { padding: 15px; } }
+@media (prefers-reduced-motion: reduce) {
+  .hosted-access-actions :is(a, button), .hosted-header-account, .hosted-handoff button { transition: none; }
+}
