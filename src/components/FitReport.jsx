@@ -33,7 +33,7 @@ export default function FitReport({ result }) {
         </article>) : <p className="fit-empty">No requirements in this group.</p>}
       </details>;
     })}
-    {result.changes?.length > 0 && <details className="fit-group"><summary>Compare the edited bullets</summary>{result.changes.map((change, index) => <article className="fit-item" key={index}><small>Original</small><p>{change.original}</p><small>Revised</small><p>{change.revised}</p></article>)}</details>}
+    {result.changes?.length > 0 && <details className="fit-group"><summary><h3>Compare the edited bullets</h3></summary>{result.changes.map((change, index) => <article className="fit-item" key={index}><small>Original</small><p>{change.original}</p><small>Revised</small><p>{change.revised}</p></article>)}</details>}
     {result.improvements?.length > 0 && <section className="analysis-section">
       <h3 className="analysis-title">Edits made</h3><ul className="improvements-list">{result.improvements.map((text, i) => <li key={i}>{text}</li>)}</ul>
     </section>}

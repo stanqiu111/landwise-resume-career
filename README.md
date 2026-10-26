@@ -13,13 +13,13 @@ students.
 
 <br>
 
-[![Live site](https://img.shields.io/badge/live-landwise--resume.vercel.app-3b5bdb?style=flat-square&logo=vercel&logoColor=white)](https://landwise-resume.vercel.app)
-[![License: MIT](https://img.shields.io/badge/license-MIT-f59e0b?style=flat-square)](LICENSE)
-![No signup](https://img.shields.io/badge/signup-not%20needed-22c55e?style=flat-square)
-![No API key](https://img.shields.io/badge/API%20key-not%20needed-22c55e?style=flat-square)
-![PDF and DOCX](https://img.shields.io/badge/export-PDF%20%26%20DOCX-a78bfa?style=flat-square)
-![Career events](https://img.shields.io/badge/career%20events-Canada%20%26%20US-f472b6?style=flat-square)
-![React 19](https://img.shields.io/badge/React-19-38bdf8?style=flat-square&logo=react&logoColor=white)
+[![Live site](https://img.shields.io/badge/live-landwise--resume.vercel.app-ff4d2e?style=flat-square&logo=vercel&logoColor=white)](https://landwise-resume.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-ffb020?style=flat-square)](LICENSE)
+![No signup](https://img.shields.io/badge/signup-not%20needed-34c759?style=flat-square)
+![No API key](https://img.shields.io/badge/API%20key-not%20needed-34c759?style=flat-square)
+![PDF and DOCX](https://img.shields.io/badge/export-PDF%20%26%20DOCX-7c5cff?style=flat-square)
+![Career events](https://img.shields.io/badge/career%20events-Canada%20%26%20US-12b5a6?style=flat-square)
+![React 19](https://img.shields.io/badge/React-19-2f5bff?style=flat-square&logo=react&logoColor=white)
 
 <br>
 
